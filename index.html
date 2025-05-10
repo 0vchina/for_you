@@ -1,26 +1,29 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>AR GPS Test</title>
+    <title>AR GPS Demo</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Подключение необходимых библиотек -->
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://unpkg.com/aframe-ar@1.8.0/dist/aframe-ar.min.js"></script>
     <script src="https://unpkg.com/aframe-gps-camera-component@1.7.1/dist/aframe-gps-camera-component.min.js"></script>
   </head>
   <body style="margin: 0; overflow: hidden;">
-    <a-scene 
-      embedded 
+    <a-scene
+      embedded
       vr-mode-ui="enabled: false"
-      arjs="sourceType: webcam; debugUIEnabled: false;">
-      
+      arjs="sourceType: webcam; debugUIEnabled: false;"
+    >
+      <!-- Камера с GPS -->
       <a-camera gps-camera rotation-reader></a-camera>
 
-      <a-box 
-        position="0 0 0"
-        color="red"
+      <!-- 3D-модель на заданных координатах -->
+      <a-entity
+        gltf-model="model.glb"
+        gps-entity-place="latitude: 53.9000; longitude: 27.5667;"
         scale="10 10 10"
-        gps-entity-place="latitude: 53.9000; longitude: 27.5667;">
-      </a-box>
+        rotation="0 180 0"
+      ></a-entity>
     </a-scene>
   </body>
 </html>
