@@ -8,21 +8,11 @@
     <script src="https://unpkg.com/aframe-gps-camera-component@1.7.1/dist/aframe-gps-camera-component.min.js"></script>
   </head>
   <body style="margin: 0; overflow: hidden;">
-    <a-scene 
-      embedded
-      vr-mode-ui="enabled: false"
-      arjs="sourceType: webcam; debugUIEnabled: false;"
-    >
-      <!-- GPS-камера -->
-      <a-camera gps-camera rotation-reader></a-camera>
-
-      <!-- 3D-модель в указанной точке -->
-      <a-entity 
-        gltf-model="model.glb"
-        gps-entity-place="latitude: 52.153513; longitude: 26.195214;"
-        scale="10 10 10"
-        rotation="0 180 0"
-      ></a-entity>
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+      <a-marker preset="hiro">
+        <a-box position="0 0.5 0" material="color: red;"></a-box>
+      </a-marker>
+      <a-entity camera></a-entity>
     </a-scene>
   </body>
 </html>
