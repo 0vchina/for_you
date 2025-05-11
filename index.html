@@ -1,57 +1,159 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>WebAR: Модель на 50 м от лавочки (GPS)</title>
+  <meta charset="utf-8" />
+  <title>WebAR GPS Fixed Model</title>
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.2/aframe/build/aframe-ar.min.js"></script>
-  <script src="https://unpkg.com/aframe-gps-camera/dist/aframe-gps-camera.min.js"></script>
-  <style>
-    body { margin: 0; overflow: hidden; }
-    #info {
-      position: absolute;
-      top: 10px; left: 10px;
-      background: rgba(0, 0, 0, 0.8);
-      color: yellow;
-      font-family: monospace;
-      padding: 10px;
-      font-size: 14px;
-      z-index: 999;
-      white-space: pre-line;
-    }
-  </style>
 </head>
-<body>
+<body style="margin: 0; overflow: hidden;">
+<div id="debugInfo" style="
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.8);
+  color: yellow;
+  font-family: monospace;
+  font-size: 14px;
+  white-space: pre-line;
+  z-index: 999;
+">
+  GPS: инициализация...
+</div>
 
-<div id="info">Ожидание GPS...</div>
+<a-scene
+  vr-mode-ui="enabled: false"
+  embedded
+  arjs="sourceType: webcam; trackingMethod: best;"
+>
+  <a-camera></a-camera>
 
-<a-scene embedded arjs>
-  <!-- Камера с GPS -->
-  <a-entity camera gps-camera rotation-reader></a-entity>
-
-  <!-- Модель: точно в 50 м на восток от лавочки -->
   <a-entity
-    gltf-model="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF/Duck.gltf"
+    id="targetModel"
+    gltf-model="model.glb"
     scale="3 3 3"
-    rotation="0 105 0"
-    gps-entity-place="latitude: 52.1534551; longitude: 26.1956841"
+    rotation="0 180 0"
+    visible="false"
   ></a-entity>
 </a-scene>
 
 <script>
-  const info = document.getElementById('info');
+  const debugInfo = document.getElementById('debugInfo');
+  const model = document.getElementById('targetModel');
 
-  window.addEventListener('gps-camera-update-position', (e) => {
-    const { latitude, longitude, accuracy } = e.detail.position;
-    info.innerText =
-      `GPS активен:\n` +
-      `Координаты: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n` +
-      `Точность: ${accuracy.toFixed(1)} м`;
-  });
+  // Координаты лавочки
+  const benchLat = 52.1534551;
+  const benchLon = 26.1951000;
 
-  window.addEventListener('gps-camera-error', (e) => {
-    info.innerText = 'Ошибка GPS:\n' + e.detail.message;
-  });
+  // Функция вычисления GPS-точки 50м на восток (90°)
+  function computeDestination(lat, lon, distanceMeters, bearingDegrees) {
+    const R = 6378137;
+    const bearing = bearingDegrees * Math.PI / 180;
+    const latRad = lat * Math.PI / 180;
+    const lonRad = lon * Math.PI / 180;
+
+    const newLat = Math.asin(
+      Math.sin(latRad) * Math.cos(distanceMeters / R) +
+      Math.cos(latRad) * Math.sin(distanceMeters / R) * Math.cos(bearing)
+    );
+
+    const newLon = lonRad + Math.atan2(
+      Math.sin(bearing) * Math.sin(distanceMeters / R) * Math.cos(latRad),
+      Math.cos(distanceMeters / R) - Math.sin(latRad) * Math.sin(newLat)
+    );
+
+    return {
+      lat: newLat * 180 / Math.PI,
+      lon: newLon * 180 / Math.PI
+    };
+  }
+
+  // Модель должна появляться в этой точке
+  const target = computeDestination(benchLat, benchLon, 50, 90);
+  const targetLat = target.lat;
+  const targetLon = target.lon;
+
+  const maxDistance = 2000;
+  const positionBuffer = [];
+  const bufferSize = 5;
+  let modelLocked = false;
+
+  function computeDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const toRad = deg => deg * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  function computeOffset(lat1, lon1, lat2, lon2) {
+    const R = 6378137;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const x = dLon * R * Math.cos(lat1 * Math.PI / 180);
+    const z = dLat * R;
+    return { x, z: -z };
+  }
+
+  function getSmoothedPosition(newPos) {
+    positionBuffer.push(newPos);
+    if (positionBuffer.length > bufferSize) positionBuffer.shift();
+
+    const avg = positionBuffer.reduce(
+      (acc, p) => ({
+        x: acc.x + p.x,
+        z: acc.z + p.z
+      }),
+      { x: 0, z: 0 }
+    );
+
+    return {
+      x: avg.x / positionBuffer.length,
+      z: avg.z / positionBuffer.length
+    };
+  }
+
+  navigator.geolocation.watchPosition(
+    pos => {
+      if (modelLocked) return;
+
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      const distance = computeDistance(lat, lon, targetLat, targetLon);
+
+      debugInfo.innerText =
+        `Ваши координаты:\n${lat.toFixed(6)}, ${lon.toFixed(6)}\n` +
+        `До цели: ${distance.toFixed(1)} м\n` +
+        'Ожидание фиксации...';
+
+      if (distance <= maxDistance) {
+        const offset = computeOffset(lat, lon, targetLat, targetLon);
+        const smooth = getSmoothedPosition(offset);
+        model.setAttribute('position', `${smooth.x} 0 ${smooth.z}`);
+        model.setAttribute('visible', true);
+
+        if (positionBuffer.length >= bufferSize) {
+          modelLocked = true;
+          debugInfo.innerText += '\nМодель зафиксирована!';
+          console.log("Модель зафиксирована:", smooth);
+        }
+      } else {
+        model.setAttribute('visible', false);
+        positionBuffer.length = 0;
+      }
+    },
+    err => {
+      console.error('Ошибка GPS:', err);
+      debugInfo.innerText = `Ошибка GPS:\n${err.message}`;
+    },
+    { enableHighAccuracy: true }
+  );
 </script>
 
 </body>
