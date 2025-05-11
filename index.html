@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>WebAR GPS 6DoF</title>
+    <title>WebAR GPS 6DoF (20 метров)</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.2/aframe/build/aframe-ar.min.js"></script>
   </head>
@@ -29,28 +29,54 @@
       <a-camera gps-camera rotation-reader></a-camera>
 
       <a-entity
+        id="targetModel"
         gltf-model="model.glb"
         scale="3 3 3"
         rotation="0 180 0"
         gps-entity-place="latitude: 52.1534551; longitude: 26.1951000;"
+        visible="false"
       ></a-entity>
     </a-scene>
 
     <script>
-      // Показ координат и точности
       const debug = document.getElementById("debugInfo");
+      const model = document.getElementById("targetModel");
+
+      const targetLat = 52.1534551;
+      const targetLon = 26.1951000;
+      const maxDistance = 20; // метров
+
+      function computeDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371000;
+        const toRad = deg => deg * Math.PI / 180;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+          Math.sin(dLon / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      }
 
       window.addEventListener('gps-camera-update-position', e => {
-        const lat = e.detail.position.latitude.toFixed(6);
-        const lon = e.detail.position.longitude.toFixed(6);
+        const lat = e.detail.position.latitude;
+        const lon = e.detail.position.longitude;
         const acc = e.detail.position.accuracy.toFixed(1);
-        debug.innerText = `GPS позиция:\n${lat}, ${lon}\nТочность: ±${acc} м`;
+
+        const distance = computeDistance(lat, lon, targetLat, targetLon);
+
+        debug.innerText =
+          `GPS позиция:\n${lat.toFixed(6)}, ${lon.toFixed(6)}\n` +
+          `Точность: ±${acc} м\n` +
+          `До цели: ${distance.toFixed(1)} м`;
+
+        model.setAttribute('visible', distance <= maxDistance);
       });
 
       AFRAME.registerComponent('rotation-reader', {
         tick: function () {
-          const rot = this.el.object3D.rotation;
-          // Можно использовать rot.y для направления на север
+          // Можно использовать this.el.object3D.rotation.y при необходимости
         }
       });
     </script>
