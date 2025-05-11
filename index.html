@@ -1,52 +1,58 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8">
-    <title>WebAR — Модель в 50м от лавочки</title>
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
-    <script src="https://unpkg.com/aframe-gps-camera/dist/aframe-gps-camera.min.js"></script>
-    <style>
-      body { margin: 0; overflow: hidden; }
-      #info {
-        position: absolute;
-        top: 10px; left: 10px;
-        background: rgba(0,0,0,0.8);
-        color: #0f0;
-        font-family: monospace;
-        font-size: 14px;
-        padding: 10px;
-        z-index: 999;
-      }
-    </style>
-  </head>
-  <body>
+<head>
+  <meta charset="utf-8">
+  <title>WebAR: Модель на 50 м от лавочки (GPS)</title>
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.2/aframe/build/aframe-ar.min.js"></script>
+  <script src="https://unpkg.com/aframe-gps-camera/dist/aframe-gps-camera.min.js"></script>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #info {
+      position: absolute;
+      top: 10px; left: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      color: yellow;
+      font-family: monospace;
+      padding: 10px;
+      font-size: 14px;
+      z-index: 999;
+      white-space: pre-line;
+    }
+  </style>
+</head>
+<body>
 
-    <div id="info">Ожидание GPS...</div>
+<div id="info">Ожидание GPS...</div>
 
-    <a-scene embedded arjs>
-      <!-- Камера с GPS -->
-      <a-entity camera gps-camera rotation-reader></a-entity>
+<a-scene embedded arjs>
+  <!-- Камера с GPS -->
+  <a-entity camera gps-camera rotation-reader></a-entity>
 
-      <!-- Модель, точно по GPS в 50 м на восток от лавочки -->
-      <a-entity
-        gltf-model="model.glb"
-        scale="3 3 3"
-        rotation="0 105 0"
-        gps-entity-place="latitude: 52.1534551; longitude: 26.1956841"
-      ></a-entity>
-    </a-scene>
+  <!-- Модель: точно в 50 м на восток от лавочки -->
+  <a-entity
+    gltf-model="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF/Duck.gltf"
+    scale="3 3 3"
+    rotation="0 105 0"
+    gps-entity-place="latitude: 52.1534551; longitude: 26.1956841"
+  ></a-entity>
+</a-scene>
 
-    <script>
-      const info = document.getElementById('info');
-      window.addEventListener('gps-camera-update-position', (e) => {
-        const { latitude, longitude, accuracy } = e.detail.position;
-        info.innerText =
-          `GPS активен:\n` +
-          `Ваши координаты:\n${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n` +
-          `Точность: ${accuracy.toFixed(1)} м`;
-      });
-    </script>
+<script>
+  const info = document.getElementById('info');
 
-  </body>
+  window.addEventListener('gps-camera-update-position', (e) => {
+    const { latitude, longitude, accuracy } = e.detail.position;
+    info.innerText =
+      `GPS активен:\n` +
+      `Координаты: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n` +
+      `Точность: ${accuracy.toFixed(1)} м`;
+  });
+
+  window.addEventListener('gps-camera-error', (e) => {
+    info.innerText = 'Ошибка GPS:\n' + e.detail.message;
+  });
+</script>
+
+</body>
 </html>
