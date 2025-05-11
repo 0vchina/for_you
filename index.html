@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <title>WebAR GPS</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://rawcdn.githack.com/AR-js-org/AR.js/3.4.2/aframe/build/aframe-ar.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.2/aframe/build/aframe-ar.min.js"></script>
   </head>
   <body style="margin: 0; overflow: hidden;">
     <a-scene
@@ -15,13 +15,80 @@
       <!-- Камера с GPS -->
       <a-camera gps-camera rotation-reader></a-camera>
 
-      <!-- 3D-модель по координатам -->
+      <!-- 3D-модель, показывается в радиусе 20 м -->
       <a-entity 
         gltf-model="model/model.glb"
-        scale="1 1 1"
+        scale="10 10 10"
+        rotation="0 180 0"
+        position="0 2 0"
         gps-entity-place="latitude: 53.900000; longitude: 27.566667"
-        rotation="0 0 0"
+        show-nearby="latitude: 53.900000; longitude: 27.566667; maxDistance: 20"
+        visible="false"
       ></a-entity>
     </a-scene>
+
+    <!-- Компонент для чтения поворота -->
+    <script>
+      AFRAME.registerComponent('rotation-reader', {
+        tick: function () {
+          // Здесь можно читать ориентацию, если нужно
+          const rotation = this.el.object3D.rotation;
+        }
+      });
+    </script>
+
+    <!-- Компонент видимости в радиусе -->
+    <script>
+      AFRAME.registerComponent('show-nearby', {
+        schema: {
+          latitude: { type: 'number' },
+          longitude: { type: 'number' },
+          maxDistance: { type: 'number', default: 20 }
+        },
+
+        init: function () {
+          this.camera = document.querySelector('[gps-camera]');
+          this.visible = false;
+        },
+
+        tick: function () {
+          const gps = this.camera.components['gps-camera'];
+          if (!gps || !gps.currentCoords) {
+            console.log('Ожидание координат GPS...');
+            return;
+          }
+
+          const userCoords = gps.currentCoords;
+          const distance = this.computeDistance(
+            userCoords.latitude,
+            userCoords.longitude,
+            this.data.latitude,
+            this.data.longitude
+          );
+
+          const shouldBeVisible = distance <= this.data.maxDistance;
+          if (shouldBeVisible !== this.visible) {
+            this.el.setAttribute('visible', shouldBeVisible);
+            console.log(`Модель ${shouldBeVisible ? 'показана' : 'скрыта'}, расстояние: ${distance.toFixed(2)} м`);
+            this.visible = shouldBeVisible;
+          }
+        },
+
+        computeDistance: function (lat1, lon1, lat2, lon2) {
+          const R = 6371000; // радиус Земли в метрах
+          const toRad = deg => deg * Math.PI / 180;
+          const dLat = toRad(lat2 - lat1);
+          const dLon = toRad(lon2 - lon1);
+
+          const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          return R * c;
+        }
+      });
+    </script>
   </body>
 </html>
