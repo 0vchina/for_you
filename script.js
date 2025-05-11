@@ -2,7 +2,7 @@ import * as THREE from 'https://cdn.skypack.dev/three@0.150.0';
 import { GLTFLoader } from 'https://cdn.skypack.dev/three/examples/jsm/loaders/GLTFLoader.js';
 import { ARButton } from 'https://cdn.skypack.dev/three/examples/jsm/webxr/ARButton.js';
 
-const targetCoords = { lat: 52.153500, lon: 26.195100 }; // Задай свои координаты
+const targetCoords = { lat: 26.195100, lon: 52.153500 }; // Задай свои координаты
 const activationRadius = 100; // в метрах
 
 
