@@ -1,124 +1,52 @@
-<div id="debugInfo" style="
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  padding: 10px;
-  background: rgba(0, 0, 0, 0.8);
-  color: yellow;
-  font-family: monospace;
-  font-size: 14px;
-  white-space: pre-line;
-  z-index: 999;
-">
-  GPS: инициализация...
-</div>
+<script src="https://rawcdn.githack.com/AR-js-org/AR.js/3.4.2/aframe/build/aframe-ar.js"></script>
 
 <a-scene
-  vr-mode-ui="enabled: false"
   embedded
   arjs="sourceType: webcam; trackingMethod: best;"
+  vr-mode-ui="enabled: false"
 >
   <a-camera></a-camera>
 
-  <a-entity
-    id="targetModel"
-    gltf-model="model.glb"
-    scale="0.01 0.01 0.01"
-    rotation="0 180 0"
-    visible="false"
-  >
-    <a-animation
-      id="scaleIn"
-      attribute="scale"
-      from="0.01 0.01 0.01"
-      to="3 3 3"
-      dur="800"
-      easing="ease-out"
-      begin="showModel"
-    ></a-animation>
-
-    <a-animation
-      id="scaleOut"
-      attribute="scale"
-      from="3 3 3"
-      to="0.01 0.01 0.01"
-      dur="500"
-      easing="ease-in"
-      begin="hideModel"
-      fill="forwards"
-    ></a-animation>
+  <a-entity id="modelContainer" visible="false">
+    <a-entity
+      id="targetModel"
+      gltf-model="model.glb"
+      scale="0.01 0.01 0.01"
+      rotation="0 180 0"
+    ></a-entity>
   </a-entity>
 </a-scene>
 
 <script>
-const debugInfo = document.getElementById('debugInfo');
 const model = document.getElementById('targetModel');
+const container = document.getElementById('modelContainer');
 
-// Точка активации
-const entryLat = 52.1534551;
-const entryLon = 26.1951000;
-const entryDistance = 15;
-
-// Точка, где должна появляться модель
-const anchorLat = 52.153400;
-const anchorLon = 26.195200;
-
-let modelActivated = false;
-
-function computeDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371000;
-  const toRad = deg => deg * Math.PI / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-    Math.sin(dLon / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+// Пример анимации вручную через JS
+function animateScaleUp() {
+  model.setAttribute('animation__scale', {
+    property: 'scale',
+    to: '3 3 3',
+    dur: 800,
+    easing: 'easeOutQuad'
+  });
 }
 
-function computeOffset(lat1, lon1, lat2, lon2) {
-  const R = 6378137;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const x = dLon * R * Math.cos(lat1 * Math.PI / 180);
-  const z = dLat * R;
-  return { x, z: -z };
+function animateScaleDown() {
+  model.setAttribute('animation__scale', {
+    property: 'scale',
+    to: '0.01 0.01 0.01',
+    dur: 500,
+    easing: 'easeInQuad'
+  });
 }
 
-navigator.geolocation.watchPosition(
-  pos => {
-    const lat = pos.coords.latitude;
-    const lon = pos.coords.longitude;
-    const distance = computeDistance(lat, lon, entryLat, entryLon);
+// Включение камеры и логика показа модели (добавь GPS как в прежнем примере)
+container.setAttribute('visible', true);
+animateScaleUp();
 
-    debugInfo.innerText =
-      `Ваши координаты:\n${lat.toFixed(6)}, ${lon.toFixed(6)}\n` +
-      `До точки входа: ${distance.toFixed(1)} м\n`;
-
-    if (!modelActivated && distance <= entryDistance) {
-      const offset = computeOffset(lat, lon, anchorLat, anchorLon);
-      model.setAttribute('position', `${offset.x} 0 ${offset.z}`);
-      model.setAttribute('visible', true);
-      model.emit('showModel');
-      modelActivated = true;
-      debugInfo.innerText += '\nМодель активирована!';
-    }
-
-    if (modelActivated && distance > entryDistance + 5) {
-      model.emit('hideModel');
-      setTimeout(() => {
-        model.setAttribute('visible', false);
-      }, 500); // после окончания анимации
-      modelActivated = false;
-      debugInfo.innerText += '\nМодель скрыта (вы покинули зону).';
-    }
-  },
-  err => {
-    console.error('Ошибка GPS:', err);
-    debugInfo.innerText = `Ошибка GPS:\n${err.message}`;
-  },
-  { enableHighAccuracy: true }
-);
+// Пример отключения:
+setTimeout(() => {
+  animateScaleDown();
+  setTimeout(() => container.setAttribute('visible', false), 500);
+}, 5000);
 </script>
