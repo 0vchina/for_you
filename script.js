@@ -1,26 +1,26 @@
-import * as THREE from 'https://cdn.skypack.dev/three@0.150.0';
-import { GLTFLoader } from 'https://cdn.skypack.dev/three/examples/jsm/loaders/GLTFLoader.js';
-import { ARButton } from 'https://cdn.skypack.dev/three/examples/jsm/webxr/ARButton.js';
-
 const targetCoords = { lat: 52.153500, lon: 26.195100 }; // Задай свои координаты
 const activationRadius = 100; // в метрах
 
 document.getElementById('start').addEventListener('click', () => {
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      const userLat = pos.coords.latitude;
-      const userLon = pos.coords.longitude;
-      const distance = getDistanceMeters(userLat, userLon, targetCoords.lat, targetCoords.lon);
-      if (distance <= activationRadius) {
-        document.getElementById('start').remove();
-        initAR();
-      } else {
-        alert(`Слишком далеко (${distance.toFixed(1)} м). Нужно быть ближе чем ${activationRadius} м.`);
-      }
-    },
-    (err) => alert("Ошибка GPS: " + err.message),
-    { enableHighAccuracy: true }
-  );
+  if (!navigator.geolocation) {
+    alert("Геолокация не поддерживается");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(pos => {
+    const userLat = pos.coords.latitude;
+    const userLon = pos.coords.longitude;
+    const distance = getDistanceMeters(userLat, userLon, targetCoords.lat, targetCoords.lon);
+
+    if (distance <= activationRadius) {
+      document.getElementById('start').remove();
+      initAR();
+    } else {
+      alert(`Вы слишком далеко (${distance.toFixed(1)} м)`);
+    }
+  }, err => {
+    alert("Ошибка GPS: " + err.message);
+  }, { enableHighAccuracy: true });
 });
 
 function initAR() {
@@ -31,14 +31,14 @@ function initAR() {
   renderer.xr.enabled = true;
   document.body.appendChild(renderer.domElement);
 
-  document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+  document.body.appendChild(THREE.ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
-  const loader = new GLTFLoader();
-  loader.load('your_model.glb', (gltf) => {
+  const loader = new THREE.GLTFLoader();
+  loader.load('model/your_model.glb', (gltf) => {
     const model = gltf.scene;
-    model.position.set(0, 0, -5); // 5 м впереди
+    model.position.set(0, 0, -5);
     scene.add(model);
-  }, undefined, (err) => {
+  }, undefined, err => {
     console.error("Ошибка загрузки модели:", err);
   });
 
