@@ -14,7 +14,7 @@
     <a-scene
       vr-mode-ui="enabled: false"
       embedded
-      arjs="sourceType: webcam; gpsMinAccuracy: 10000; debugUIEnabled: true"
+      arjs="sourceType: webcam; trackingMethod: best; locationEnabled: true; gpsMinAccuracy: 10000; debugUIEnabled: true;"
     >
       <a-camera gps-camera rotation-reader></a-camera>
     </a-scene>
