@@ -5,26 +5,25 @@ import { ARButton } from 'https://cdn.skypack.dev/three/examples/jsm/webxr/ARBut
 const targetCoords = { lat: 52.153500, lon: 26.195100 }; // Задай свои координаты
 const activationRadius = 100; // в метрах
 
-let camera, scene, renderer, controller;
 
-document.getElementById('start-ar').addEventListener('click', () => {
-  navigator.geolocation.getCurrentPosition(pos => {
-    const userLat = pos.coords.latitude;
-    const userLon = pos.coords.longitude;
+navigator.geolocation.getCurrentPosition(pos => {
+  const userLat = pos.coords.latitude;
+  const userLon = pos.coords.longitude;
 
-    if (getDistanceMeters(userLat, userLon, targetCoords.lat, targetCoords.lon) <= activationRadius) {
-      initAR();
-    } else {
-      alert("Вы не на нужной локации.");
-    }
-  });
-});
+  if (getDistanceMeters(userLat, userLon, targetCoords.lat, targetCoords.lon) <= activationRadius) {
+    initAR();
+  } else {
+    alert("Вы не на нужной локации.");
+  }
+}, err => {
+  alert("Ошибка получения координат: " + err.message);
+}, { enableHighAccuracy: true });
 
 function initAR() {
-  scene = new THREE.Scene();
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera();
 
-  camera = new THREE.PerspectiveCamera();
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.xr.enabled = true;
   document.body.appendChild(renderer.domElement);
@@ -34,7 +33,7 @@ function initAR() {
   const loader = new GLTFLoader();
   loader.load('model/your_model.glb', gltf => {
     const model = gltf.scene;
-    model.position.set(0, 0, -5); // 5 м перед пользователем
+    model.position.set(0, 0, -5); // ставим модель 5 м перед пользователем
     scene.add(model);
   });
 
