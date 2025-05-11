@@ -29,40 +29,18 @@
     >
       <a-camera></a-camera>
 
-      <!-- Модель и анимации -->
       <a-entity
         id="targetModel"
         gltf-model="model.glb"
         scale="0.01 0.01 0.01"
         rotation="0 180 0"
         visible="false"
-      >
-        <a-animation
-          id="scaleIn"
-          attribute="scale"
-          from="0.01 0.01 0.01"
-          to="3 3 3"
-          dur="800"
-          easing="ease-out"
-          begin="showModel"
-        ></a-animation>
-
-        <a-animation
-          id="scaleOut"
-          attribute="scale"
-          from="3 3 3"
-          to="0.01 0.01 0.01"
-          dur="500"
-          easing="ease-in"
-          begin="hideModel"
-          fill="forwards"
-        ></a-animation>
-      </a-entity>
+      ></a-entity>
     </a-scene>
 
     <script>
-      const debugInfo = document.getElementById('debugInfo');
-      const model = document.getElementById('targetModel');
+      const debugInfo = document.getElementById("debugInfo");
+      const model = document.getElementById("targetModel");
 
       const entryLat = 52.1534551;
       const entryLon = 26.1951000;
@@ -71,6 +49,7 @@
       const entryDistance = 15;
 
       let modelActive = false;
+      let scaleInterval = null;
 
       function computeDistance(lat1, lon1, lat2, lon2) {
         const R = 6371000;
@@ -94,6 +73,32 @@
         return { x, z: -z };
       }
 
+      function animateScale(from, to, duration = 800) {
+        let startTime = null;
+        const [fx, fy, fz] = from;
+        const [tx, ty, tz] = to;
+
+        cancelAnimationFrame(scaleInterval);
+
+        function step(timestamp) {
+          if (!startTime) startTime = timestamp;
+          const progress = Math.min((timestamp - startTime) / duration, 1);
+          const ease = progress < 1 ? 1 - Math.pow(1 - progress, 3) : 1;
+
+          const sx = fx + (tx - fx) * ease;
+          const sy = fy + (ty - fy) * ease;
+          const sz = fz + (tz - fz) * ease;
+
+          model.setAttribute("scale", `${sx} ${sy} ${sz}`);
+
+          if (progress < 1) {
+            scaleInterval = requestAnimationFrame(step);
+          }
+        }
+
+        scaleInterval = requestAnimationFrame(step);
+      }
+
       navigator.geolocation.watchPosition(
         pos => {
           const lat = pos.coords.latitude;
@@ -106,24 +111,22 @@
 
           if (!modelActive && distance <= entryDistance) {
             const offset = computeOffset(lat, lon, anchorLat, anchorLon);
-            model.setAttribute('position', `${offset.x} 0 ${offset.z}`);
-            model.setAttribute('visible', true);
-            model.emit('showModel');
+            model.setAttribute("position", `${offset.x} 0 ${offset.z}`);
+            model.setAttribute("visible", true);
+            animateScale([0.01, 0.01, 0.01], [3, 3, 3]);
             modelActive = true;
-            debugInfo.innerText += '\nМодель активирована!';
+            debugInfo.innerText += "\nМодель активирована!";
           }
 
           if (modelActive && distance > entryDistance + 5) {
-            model.emit('hideModel');
-            setTimeout(() => {
-              model.setAttribute('visible', false);
-            }, 500);
+            animateScale([3, 3, 3], [0.01, 0.01, 0.01]);
+            setTimeout(() => model.setAttribute("visible", false), 500);
             modelActive = false;
-            debugInfo.innerText += '\nМодель скрыта (вышли из зоны).';
+            debugInfo.innerText += "\nМодель скрыта.";
           }
         },
         err => {
-          console.error('Ошибка GPS:', err);
+          console.error("Ошибка GPS:", err);
           debugInfo.innerText = `Ошибка GPS:\n${err.message}`;
         },
         { enableHighAccuracy: true }
