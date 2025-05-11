@@ -1,22 +1,43 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta charset="utf-8">
-    <title>WebAR GPS Test</title>
+    <meta charset="utf-8" />
+    <title>WebAR GPS Stable</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
     <script defer src="app.js"></script>
     <style>
-      body { margin: 0; overflow: hidden; }
+      body, html { margin: 0; overflow: hidden; background: black; }
+      .loading {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(0,0,0,0.9);
+        color: white;
+        font-family: sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+        font-size: 18px;
+      }
     </style>
   </head>
   <body>
+    <div class="loading" id="loadingText">⏳ Ожидание стабильного GPS...</div>
     <a-scene
       vr-mode-ui="enabled: false"
       embedded
-      arjs="sourceType: webcam; trackingMethod: best; locationEnabled: true; gpsMinAccuracy: 10000; debugUIEnabled: true;"
+      arjs="sourceType: webcam; locationEnabled: true; gpsMinAccuracy: 10000; debugUIEnabled: false;"
     >
       <a-camera gps-camera rotation-reader></a-camera>
     </a-scene>
+
+    <script>
+      window.addEventListener('gps-camera-update-position', () => {
+        const loading = document.getElementById('loadingText');
+        if (loading) loading.style.display = 'none';
+      });
+    </script>
   </body>
 </html>
