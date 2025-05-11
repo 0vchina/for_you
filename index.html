@@ -32,7 +32,7 @@
   <a-entity
     id="targetModel"
     gltf-model="model.glb"
-    scale="3 3 3"
+    scale="1 1 1"
     rotation="0 180 0"
     visible="false"
   ></a-entity>
@@ -81,7 +81,7 @@
     return (toDeg(brng) + 360) % 360;
   }
 
-  const target = computeDestination(benchLat, benchLon, 50, 0); // 0° = север
+  const target = computeDestination(benchLat, benchLon, 5, 0); // 0° = север
   const targetLat = target.lat;
   const targetLon = target.lon;
 
