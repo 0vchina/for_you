@@ -6,18 +6,24 @@ const targetCoords = { lat: 52.153500, lon: 26.195100 }; // Задай свои 
 const activationRadius = 100; // в метрах
 
 
-navigator.geolocation.getCurrentPosition(pos => {
-  const userLat = pos.coords.latitude;
-  const userLon = pos.coords.longitude;
-
-  if (getDistanceMeters(userLat, userLon, targetCoords.lat, targetCoords.lon) <= activationRadius) {
-    initAR();
-  } else {
-    alert("Вы не на нужной локации.");
-  }
-}, err => {
-  alert("Ошибка получения координат: " + err.message);
-}, { enableHighAccuracy: true });
+document.getElementById('start').addEventListener('click', () => {
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const userLat = pos.coords.latitude;
+      const userLon = pos.coords.longitude;
+      if (getDistanceMeters(userLat, userLon, targetCoords.lat, targetCoords.lon) <= activationRadius) {
+        document.getElementById('start').remove();
+        initAR();
+      } else {
+        alert("Вы не на нужной локации.");
+      }
+    },
+    err => {
+      alert("Ошибка GPS: " + err.message);
+    },
+    { enableHighAccuracy: true }
+  );
+});
 
 function initAR() {
   const scene = new THREE.Scene();
@@ -33,7 +39,7 @@ function initAR() {
   const loader = new GLTFLoader();
   loader.load('model/your_model.glb', gltf => {
     const model = gltf.scene;
-    model.position.set(0, 0, -5); // ставим модель 5 м перед пользователем
+    model.position.set(0, 0, -5); // 5 м вперёд
     scene.add(model);
   });
 
@@ -49,8 +55,8 @@ function getDistanceMeters(lat1, lon1, lat2, lon2) {
   const Δφ = (lat2 - lat1) * Math.PI / 180;
   const Δλ = (lon2 - lon1) * Math.PI / 180;
 
-  const a = Math.sin(Δφ/2)**2 +
+  const a = Math.sin(Δφ / 2) ** 2 +
             Math.cos(φ1) * Math.cos(φ2) *
-            Math.sin(Δλ/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            Math.sin(Δλ / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
