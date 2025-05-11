@@ -32,7 +32,7 @@
       <a-entity
         id="targetModel"
         gltf-model="model.glb"
-        scale="0.01 0.01 0.01"
+        scale="3 3 3"
         rotation="0 180 0"
         visible="false"
       ></a-entity>
@@ -49,7 +49,6 @@
       const entryDistance = 15;
 
       let modelActive = false;
-      let scaleInterval = null;
 
       function computeDistance(lat1, lon1, lat2, lon2) {
         const R = 6371000;
@@ -73,32 +72,6 @@
         return { x, z: -z };
       }
 
-      function animateScale(from, to, duration = 800) {
-        let startTime = null;
-        const [fx, fy, fz] = from;
-        const [tx, ty, tz] = to;
-
-        cancelAnimationFrame(scaleInterval);
-
-        function step(timestamp) {
-          if (!startTime) startTime = timestamp;
-          const progress = Math.min((timestamp - startTime) / duration, 1);
-          const ease = progress < 1 ? 1 - Math.pow(1 - progress, 3) : 1;
-
-          const sx = fx + (tx - fx) * ease;
-          const sy = fy + (ty - fy) * ease;
-          const sz = fz + (tz - fz) * ease;
-
-          model.setAttribute("scale", `${sx} ${sy} ${sz}`);
-
-          if (progress < 1) {
-            scaleInterval = requestAnimationFrame(step);
-          }
-        }
-
-        scaleInterval = requestAnimationFrame(step);
-      }
-
       navigator.geolocation.watchPosition(
         pos => {
           const lat = pos.coords.latitude;
@@ -113,14 +86,12 @@
             const offset = computeOffset(lat, lon, anchorLat, anchorLon);
             model.setAttribute("position", `${offset.x} 0 ${offset.z}`);
             model.setAttribute("visible", true);
-            animateScale([0.01, 0.01, 0.01], [3, 3, 3]);
             modelActive = true;
             debugInfo.innerText += "\nМодель активирована!";
           }
 
           if (modelActive && distance > entryDistance + 5) {
-            animateScale([3, 3, 3], [0.01, 0.01, 0.01]);
-            setTimeout(() => model.setAttribute("visible", false), 500);
+            model.setAttribute("visible", false);
             modelActive = false;
             debugInfo.innerText += "\nМодель скрыта.";
           }
