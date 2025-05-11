@@ -2,8 +2,8 @@ import * as THREE from 'https://cdn.skypack.dev/three@0.150.0';
 import { GLTFLoader } from 'https://cdn.skypack.dev/three/examples/jsm/loaders/GLTFLoader.js';
 import { ARButton } from 'https://cdn.skypack.dev/three/examples/jsm/webxr/ARButton.js';
 
-const targetCoords = { lat: 53.9000, lon: 27.5667 }; // Задай свои координаты
-const activationRadius = 10; // в метрах
+const targetCoords = { lat: 52.153500, lon: 26.195100 }; // Задай свои координаты
+const activationRadius = 100; // в метрах
 
 let camera, scene, renderer, controller;
 
