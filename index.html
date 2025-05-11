@@ -2,13 +2,13 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>WebAR GPS</title>
+    <title>WebAR GPS Debug</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.2/aframe/build/aframe-ar.min.js"></script>
   </head>
   <body style="margin: 0; overflow: hidden;">
 
-    <!-- Отладочная информация вне сцены -->
+    <!-- Внешний отладочный блок -->
     <div id="debugInfo" style="
       position: absolute;
       top: 10px;
@@ -20,7 +20,7 @@
       font-size: 14px;
       z-index: 999;
     ">
-      GPS: загрузка...
+      GPS: ожидание данных...
     </div>
 
     <!-- AR-сцена -->
@@ -29,81 +29,18 @@
       embedded
       arjs="sourceType: webcam; gpsMinAccuracy: 100; trackingMethod: best;"
     >
-      <a-camera gps-camera rotation-reader></a-camera>
-
-      <!-- 3D-модель с GPS -->
-      <a-entity 
-        gltf-model="model.glb"
-        scale="0.1 0.1 0.1"
-        rotation="0 180 0"
-        gps-entity-place="latitude: 52.1534551; longitude: 26.1951000"
-        show-nearby="latitude: 52.1534551; longitude: 26.1951000; maxDistance: 2000"
-        visible="true"
-      ></a-entity>
+      <a-camera gps-camera></a-camera>
     </a-scene>
 
+    <!-- Отслеживание GPS-события -->
     <script>
-      AFRAME.registerComponent('rotation-reader', {
-        tick: function () {
-          const rotation = this.el.object3D.rotation;
-        }
-      });
-
-      AFRAME.registerComponent('show-nearby', {
-        schema: {
-          latitude: { type: 'number' },
-          longitude: { type: 'number' },
-          maxDistance: { type: 'number', default: 2000 }
-        },
-
-        init: function () {
-          this.camera = document.querySelector('[gps-camera]');
-          this.visible = false;
-          this.debugInfo = document.getElementById('debugInfo');
-        },
-
-        tick: function () {
-          const gps = this.camera.components['gps-camera'];
-          if (!gps || !gps.currentCoords) {
-            this.debugInfo.innerText = 'GPS: ожидание координат...';
-            return;
-          }
-
-          const userCoords = gps.currentCoords;
-          const distance = this.computeDistance(
-            userCoords.latitude,
-            userCoords.longitude,
-            this.data.latitude,
-            this.data.longitude
-          );
-
-          const shouldBeVisible = distance <= this.data.maxDistance;
-          if (shouldBeVisible !== this.visible) {
-            this.el.setAttribute('visible', shouldBeVisible);
-            console.log(`Модель ${shouldBeVisible ? 'показана' : 'скрыта'}, расстояние: ${distance.toFixed(2)} м`);
-            this.visible = shouldBeVisible;
-          }
-
-          this.debugInfo.innerText =
-            `Вы: ${userCoords.latitude.toFixed(6)}, ${userCoords.longitude.toFixed(6)}\n` +
-            `До цели: ${distance.toFixed(1)} м`;
-        },
-
-        computeDistance: function (lat1, lon1, lat2, lon2) {
-          const R = 6371000;
-          const toRad = deg => deg * Math.PI / 180;
-          const dLat = toRad(lat2 - lat1);
-          const dLon = toRad(lon2 - lon1);
-
-          const a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-          return R * c;
-        }
+      window.addEventListener('gps-camera-update-position', e => {
+        const coords = e.detail.position;
+        console.log('Координаты получены:', coords);
+        document.getElementById('debugInfo').innerText =
+          `GPS EVENT:\n${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
       });
     </script>
+
   </body>
 </html>
