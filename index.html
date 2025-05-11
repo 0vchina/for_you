@@ -33,7 +33,7 @@
     id="targetModel"
     gltf-model="model.glb"
     scale="5 5 5"
-    rotation="0 270 0"
+    rotation="0 0 0"
     visible="false"
   ></a-entity>
 </a-scene>
@@ -45,6 +45,7 @@
   const benchLat = 52.1534551;
   const benchLon = 26.1951000;
 
+  // Смещение на 50 м вперёд (север)
   function computeDestination(lat, lon, distanceMeters, bearingDegrees) {
     const R = 6378137;
     const bearing = bearingDegrees * Math.PI / 180;
@@ -67,7 +68,20 @@
     };
   }
 
-  const target = computeDestination(benchLat, benchLon, 50, 90);
+  // Расчёт угла между пользователем и моделью
+  function computeBearing(lat1, lon1, lat2, lon2) {
+    const toRad = deg => deg * Math.PI / 180;
+    const toDeg = rad => rad * 180 / Math.PI;
+
+    const dLon = toRad(lon2 - lon1);
+    const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+    const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+              Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+    const brng = Math.atan2(y, x);
+    return (toDeg(brng) + 360) % 360;
+  }
+
+  const target = computeDestination(benchLat, benchLon, 50, 0); // 0° = север
   const targetLat = target.lat;
   const targetLon = target.lon;
 
@@ -134,6 +148,11 @@
         const smooth = getSmoothedPosition(offset);
         model.setAttribute('position', `${smooth.x} 0 ${smooth.z}`);
         model.setAttribute('visible', true);
+
+        // Поворот к пользователю
+        const bearingToModel = computeBearing(lat, lon, targetLat, targetLon);
+        const rotationY = (bearingToModel + 180) % 360;
+        model.setAttribute('rotation', `0 ${rotationY} 0`);
 
         if (positionBuffer.length >= bufferSize) {
           modelLocked = true;
