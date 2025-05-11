@@ -2,13 +2,12 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>WebAR GPS Debug</title>
+    <title>WebAR GPS Fallback + Модель</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.2/aframe/build/aframe-ar.min.js"></script>
   </head>
   <body style="margin: 0; overflow: hidden;">
 
-    <!-- Внешний блок для вывода информации -->
     <div id="debugInfo" style="
       position: absolute;
       top: 10px;
@@ -21,58 +20,85 @@
       white-space: pre-line;
       z-index: 999;
     ">
-      Инициализация...
+      GPS: инициализация...
     </div>
 
-    <!-- AR-сцена -->
     <a-scene
       vr-mode-ui="enabled: false"
       embedded
-      arjs="sourceType: webcam; gpsMinAccuracy: 100; trackingMethod: best;"
+      arjs="sourceType: webcam; trackingMethod: best;"
     >
-      <a-camera gps-camera></a-camera>
+      <a-entity camera></a-entity>
+
+      <!-- Модель, позиционируемая вручную -->
+      <a-entity
+        id="targetModel"
+        gltf-model="model.glb"
+        scale="0.1 0.1 0.1"
+        rotation="0 180 0"
+        visible="false"
+      ></a-entity>
     </a-scene>
 
-    <!-- Отладка координат -->
     <script>
       const debugInfo = document.getElementById('debugInfo');
+      const model = document.getElementById('targetModel');
 
-      // Проверка через navigator.geolocation
-      debugInfo.innerText = 'Проверка navigator.geolocation...';
+      // Целевая GPS-точка
+      const targetLat = 52.1534551;
+      const targetLon = 26.1951000;
+      const maxDistance = 2000; // м
 
-      navigator.geolocation.getCurrentPosition(
+      function computeDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371000;
+        const toRad = deg => deg * Math.PI / 180;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+          Math.sin(dLon / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      }
+
+      function computeOffset(lat1, lon1, lat2, lon2) {
+        const R = 6378137; // радиус Земли в метрах
+
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+
+        const x = dLon * R * Math.cos(lat1 * Math.PI / 180);
+        const z = dLat * R;
+
+        return { x, z: -z }; // z инвертирован для A-Frame координат
+      }
+
+      navigator.geolocation.watchPosition(
         pos => {
-          const coords = pos.coords;
-          console.log("navigator.geolocation работает:", coords);
-          debugInfo.innerText += `\nnavigator:\n${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+
+          const distance = computeDistance(lat, lon, targetLat, targetLon);
+          debugInfo.innerText =
+            `Ваши координаты:\n${lat.toFixed(6)}, ${lon.toFixed(6)}\n` +
+            `До цели: ${distance.toFixed(1)} м`;
+
+          if (distance <= maxDistance) {
+            const offset = computeOffset(lat, lon, targetLat, targetLon);
+
+            model.setAttribute('position', `${offset.x} 0 ${offset.z}`);
+            model.setAttribute('visible', true);
+          } else {
+            model.setAttribute('visible', false);
+          }
         },
         err => {
-          console.error("navigator.geolocation ошибка:", err);
-          debugInfo.innerText += `\nОшибка geolocation:\n${err.message}`;
+          console.error('Ошибка GPS:', err);
+          debugInfo.innerText = `Ошибка GPS:\n${err.message}`;
         },
         { enableHighAccuracy: true }
       );
-
-      // Слушаем gps-camera от AR.js
-      window.addEventListener('gps-camera-update-position', e => {
-        const coords = e.detail.position;
-        console.log('gps-camera-update-position:', coords);
-        debugInfo.innerText += `\nAR.js GPS:\n${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
-      });
-
-      // На всякий случай отслеживаем, был ли вообще создан gps-camera
-      document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => {
-          const camera = document.querySelector('[gps-camera]');
-          if (!camera || !camera.components['gps-camera']) {
-            debugInfo.innerText += '\n[!] Компонент gps-camera не найден или не инициализировался.';
-            console.warn('gps-camera компонент отсутствует или не активен.');
-          } else {
-            debugInfo.innerText += '\nКомпонент gps-camera активен.';
-            console.log('gps-camera активен.');
-          }
-        }, 3000); // ждём немного для инициализации
-      });
     </script>
   </body>
 </html>
