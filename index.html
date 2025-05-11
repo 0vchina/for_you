@@ -1,186 +1,24 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="utf-8" />
-  <title>WebAR GPS Fixed Model</title>
-  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.2/aframe/build/aframe-ar.min.js"></script>
-</head>
-<body style="margin: 0; overflow: hidden;">
-<div id="debugInfo" style="
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  padding: 10px;
-  background: rgba(0, 0, 0, 0.8);
-  color: yellow;
-  font-family: monospace;
-  font-size: 14px;
-  white-space: pre-line;
-  z-index: 999;
-">
-  Инициализация GPS...
-</div>
+  <head>
+    <meta charset="utf-8">
+    <title>WebAR модель</title>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
+    <script src="app.js"></script>
+    <style>
+      body { margin: 0; overflow: hidden; }
+    </style>
+  </head>
+  <body>
+    <a-scene
+      vr-mode-ui="enabled: false"
+      embedded
+      arjs="sourceType: webcam; gpsMinAccuracy: 50; debugUIEnabled: false;"
+    >
+      <a-camera gps-camera rotation-reader></a-camera>
 
-<a-scene
-  vr-mode-ui="enabled: false"
-  embedded
-  arjs="sourceType: webcam; trackingMethod: best;"
->
-  <a-camera></a-camera>
-
-  <a-entity
-    id="targetModel"
-    gltf-model="model.glb"
-    scale="1 1 1"
-    rotation="0 0 0"
-    visible="false"
-  ></a-entity>
-</a-scene>
-
-<script>
-  // Конфигурация
-  const CONFIG = {
-    TARGET: {
-      lat: 52.1534551,
-      lon: 26.1951000,
-      distance: 50, // метров от исходной точки
-      bearing: 0, // градусов (0 = север)
-    },
-    MODEL: {
-      yPosition: -1, // высота модели (метры)
-      maxDistance: 2000, // максимальная дистанция отображения (метры)
-      bufferSize: 5, // размер буфера сглаживания
-    },
-    EARTH_RADIUS: 6378137 // метров (WGS84)
-  };
-
-  const debugInfo = document.getElementById('debugInfo');
-  const model = document.getElementById('targetModel');
-  let modelLocked = false;
-  const positionBuffer = [];
-
-  // Преобразование градусов в радианы
-  const toRad = deg => deg * Math.PI / 180;
-
-  // Вычисление точки назначения
-  function computeDestination(lat, lon, distance, bearing) {
-    const φ1 = toRad(lat);
-    const λ1 = toRad(lon);
-    const θ = toRad(bearing);
-    const δ = distance / CONFIG.EARTH_RADIUS;
-
-    const φ2 = Math.asin(
-      Math.sin(φ1) * Math.cos(δ) +
-      Math.cos(φ1) * Math.sin(δ) * Math.cos(θ)
-    );
-
-    const λ2 = λ1 + Math.atan2(
-      Math.sin(θ) * Math.sin(δ) * Math.cos(φ1),
-      Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2)
-    );
-
-    return {
-      lat: φ2 * 180 / Math.PI,
-      lon: λ2 * 180 / Math.PI
-    };
-  }
-
-  // Вычисление расстояния по гаверсинусам
-  function computeDistance(lat1, lon1, lat2, lon2) {
-    const R = CONFIG.EARTH_RADIUS;
-    const dφ = toRad(lat2 - lat1);
-    const dλ = toRad(lon2 - lon1);
-    const a = 
-      Math.sin(dφ/2) ** 2 + 
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * 
-      Math.sin(dλ/2) ** 2;
-    return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  }
-
-  // Преобразование координат в локальные смещения
-  function computeOffset(lat1, lon1, lat2, lon2) {
-    const dφ = toRad(lat2 - lat1);
-    const dλ = toRad(lon2 - lon1);
-    const x = dλ * CONFIG.EARTH_RADIUS * Math.cos(toRad(lat1));
-    const z = dφ * CONFIG.EARTH_RADIUS;
-    return { x, z: -z };
-  }
-
-  // Сглаживание позиции
-  function getSmoothedPosition(newPos) {
-    positionBuffer.push(newPos);
-    if (positionBuffer.length > CONFIG.MODEL.bufferSize) positionBuffer.shift();
-    
-    return positionBuffer.reduce((acc, p) => ({
-      x: acc.x + p.x / positionBuffer.length,
-      z: acc.z + p.z / positionBuffer.length
-    }), { x: 0, z: 0 });
-  }
-
-  // Инициализация геолокации
-  if (!navigator.geolocation) {
-    debugInfo.innerText = 'Геолокация не поддерживается вашим браузером';
-  } else {
-    const target = computeDestination(
-      CONFIG.TARGET.lat,
-      CONFIG.TARGET.lon,
-      CONFIG.TARGET.distance,
-      CONFIG.TARGET.bearing
-    );
-
-    navigator.geolocation.watchPosition(
-      pos => {
-        if (modelLocked) return;
-
-        const { latitude: lat, longitude: lon } = pos.coords;
-        const distance = computeDistance(lat, lon, target.lat, target.lon);
-
-        // Обновление интерфейса
-        debugInfo.innerText = [
-          `Ваши координаты:`,
-          `${lat.toFixed(6)}, ${lon.toFixed(6)}`,
-          `До цели: ${distance.toFixed(1)} м`,
-          modelLocked ? 'Модель зафиксирована!' : 'Поиск позиции...'
-        ].join('\n');
-
-        if (distance <= CONFIG.MODEL.maxDistance) {
-          const offset = computeOffset(lat, lon, target.lat, target.lon);
-          const smooth = getSmoothedPosition(offset);
-          
-          model.setAttribute('position', {
-            x: smooth.x,
-            y: CONFIG.MODEL.yPosition,
-            z: smooth.z
-          });
-          model.setAttribute('visible', true);
-
-          if (positionBuffer.length >= CONFIG.MODEL.bufferSize) {
-            modelLocked = true;
-          }
-        } else {
-          model.setAttribute('visible', false);
-          positionBuffer.length = 0;
-          modelLocked = false;
-        }
-      },
-      err => {
-        debugInfo.innerText = `Ошибка GPS:\n${err.message}`;
-        console.error('GPS Error:', err);
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 3000,
-        timeout: 5000
-      }
-    );
-  }
-
-  // Обработка ошибок модели
-  model.addEventListener('error', (e) => {
-    console.error('Ошибка загрузки модели:', e.detail);
-    debugInfo.innerText += '\nОшибка загрузки 3D модели!';
-  });
-</script>
-</body>
+      <!-- Место, куда будет добавлена модель из JS -->
+    </a-scene>
+  </body>
 </html>
