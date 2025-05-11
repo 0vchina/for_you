@@ -2,9 +2,10 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>WebAR GPS 6DoF (20 метров)</title>
+    <title>AR у лавочки — с эффектом</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.2/aframe/build/aframe-ar.min.js"></script>
+    <script src="https://unpkg.com/aframe-animation-component@5.1.2/dist/aframe-animation-component.min.js"></script>
   </head>
   <body style="margin: 0; overflow: hidden;">
     <div id="debugInfo" style="
@@ -24,27 +25,46 @@
     <a-scene
       vr-mode-ui="enabled: false"
       embedded
-      arjs="sourceType: webcam; gpsMinAccuracy: 100; debugUIEnabled: false;"
+      arjs="sourceType: webcam; gpsMinAccuracy: 50; debugUIEnabled: false;"
     >
       <a-camera gps-camera rotation-reader></a-camera>
 
       <a-entity
         id="targetModel"
         gltf-model="model.glb"
-        scale="3 3 3"
+        scale="0 0 0"
         rotation="0 180 0"
-        gps-entity-place="latitude: 52.1534551; longitude: 26.1951000;"
         visible="false"
-      ></a-entity>
+        material="opacity: 0; transparent: true"
+      >
+        <!-- Анимация появления -->
+        <a-animation
+          attribute="scale"
+          dur="1000"
+          to="3 3 3"
+          easing="ease-out"
+          begin="showModel"
+        ></a-animation>
+
+        <a-animation
+          attribute="material.opacity"
+          dur="1000"
+          to="1"
+          easing="ease-out"
+          begin="showModel"
+        ></a-animation>
+      </a-entity>
     </a-scene>
 
     <script>
       const debug = document.getElementById("debugInfo");
       const model = document.getElementById("targetModel");
 
-      const targetLat = 52.1534551;
-      const targetLon = 26.1951000;
-      const maxDistance = 20; // метров
+      const benchLat = 52.1534551;
+      const benchLon = 26.1951000;
+      const maxDistance = 10;
+
+      let shown = false;
 
       function computeDistance(lat1, lon1, lat2, lon2) {
         const R = 6371000;
@@ -55,30 +75,4 @@
           Math.sin(dLat / 2) ** 2 +
           Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
           Math.sin(dLon / 2) ** 2;
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-      }
-
-      window.addEventListener('gps-camera-update-position', e => {
-        const lat = e.detail.position.latitude;
-        const lon = e.detail.position.longitude;
-        const acc = e.detail.position.accuracy.toFixed(1);
-
-        const distance = computeDistance(lat, lon, targetLat, targetLon);
-
-        debug.innerText =
-          `GPS позиция:\n${lat.toFixed(6)}, ${lon.toFixed(6)}\n` +
-          `Точность: ±${acc} м\n` +
-          `До цели: ${distance.toFixed(1)} м`;
-
-        model.setAttribute('visible', distance <= maxDistance);
-      });
-
-      AFRAME.registerComponent('rotation-reader', {
-        tick: function () {
-          // Можно использовать this.el.object3D.rotation.y при необходимости
-        }
-      });
-    </script>
-  </body>
-</html>
+        const c = 2 * Math.atan2
