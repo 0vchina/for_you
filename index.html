@@ -2,13 +2,12 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>WebAR GPS Fallback</title>
+    <title>WebAR GPS Stabilized</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.2/aframe/build/aframe-ar.min.js"></script>
   </head>
   <body style="margin: 0; overflow: hidden;">
 
-    <!-- Отладочная информация -->
     <div id="debugInfo" style="
       position: absolute;
       top: 10px;
@@ -24,20 +23,17 @@
       GPS: инициализация...
     </div>
 
-    <!-- AR-сцена -->
     <a-scene
       vr-mode-ui="enabled: false"
       embedded
       arjs="sourceType: webcam; trackingMethod: best;"
     >
-      <!-- Камера -->
       <a-camera></a-camera>
 
-      <!-- Модель, позиционируемая вручную -->
       <a-entity
         id="targetModel"
         gltf-model="model.glb"
-        scale="0.1 0.1 0.1"
+        scale="0.5 0.5 0.5"
         rotation="0 180 0"
         visible="false"
       ></a-entity>
@@ -47,12 +43,16 @@
       const debugInfo = document.getElementById('debugInfo');
       const model = document.getElementById('targetModel');
 
-      // Целевая точка
       const targetLat = 52.1534551;
       const targetLon = 26.1951000;
-      const maxDistance = 2000; // метров
+      const maxDistance = 2000;
 
-      // Функция расчёта расстояния между двумя GPS-точками
+      const positionBuffer = [];
+      const bufferSize = 5;
+      let modelLocked = false;
+      let basePosition = null;
+      let visualOffset = { x: 0, z: 0 };
+
       function computeDistance(lat1, lon1, lat2, lon2) {
         const R = 6371000;
         const toRad = deg => deg * Math.PI / 180;
@@ -66,35 +66,60 @@
         return R * c;
       }
 
-      // Смещение цели от пользователя в метрах → позиция в сцене
       function computeOffset(lat1, lon1, lat2, lon2) {
-        const R = 6378137; // радиус Земли в метрах
+        const R = 6378137;
         const dLat = (lat2 - lat1) * Math.PI / 180;
         const dLon = (lon2 - lon1) * Math.PI / 180;
-
         const x = dLon * R * Math.cos(lat1 * Math.PI / 180);
         const z = dLat * R;
-
-        return { x, z: -z }; // z инвертирован для A-Frame координат
+        return { x, z: -z };
       }
 
-      // Отслеживаем позицию пользователя
+      function getSmoothedPosition(newPos) {
+        positionBuffer.push(newPos);
+        if (positionBuffer.length > bufferSize) positionBuffer.shift();
+
+        const avg = positionBuffer.reduce(
+          (acc, p) => ({
+            x: acc.x + p.x,
+            z: acc.z + p.z
+          }),
+          { x: 0, z: 0 }
+        );
+
+        return {
+          x: avg.x / positionBuffer.length,
+          z: avg.z / positionBuffer.length
+        };
+      }
+
       navigator.geolocation.watchPosition(
         pos => {
           const lat = pos.coords.latitude;
           const lon = pos.coords.longitude;
-
           const distance = computeDistance(lat, lon, targetLat, targetLon);
+
           debugInfo.innerText =
             `Ваши координаты:\n${lat.toFixed(6)}, ${lon.toFixed(6)}\n` +
-            `До цели: ${distance.toFixed(1)} м`;
+            `До цели: ${distance.toFixed(1)} м\n` +
+            (modelLocked ? 'Модель зафиксирована' : 'Ожидание фиксации...');
 
-          if (distance <= maxDistance) {
+          if (!modelLocked && distance <= maxDistance) {
             const offset = computeOffset(lat, lon, targetLat, targetLon);
-            model.setAttribute('position', `${offset.x} 0 ${offset.z}`);
+            const smooth = getSmoothedPosition(offset);
+            model.setAttribute('position', `${smooth.x} 0 ${smooth.z}`);
             model.setAttribute('visible', true);
-          } else {
+
+            if (positionBuffer.length >= bufferSize) {
+              basePosition = { ...smooth };
+              modelLocked = true;
+              console.log("Модель зафиксирована:", basePosition);
+            }
+          }
+
+          if (distance > maxDistance && !modelLocked) {
             model.setAttribute('visible', false);
+            positionBuffer.length = 0;
           }
         },
         err => {
@@ -103,6 +128,53 @@
         },
         { enableHighAccuracy: true }
       );
+
+      // === акселерометр с возвратом модели к базе ===
+      let lastAlpha = null;
+      let lastBeta = null;
+      let lastGamma = null;
+      const smoothingFactor = 0.05;
+
+      let stableFrames = 0;
+      const stabilityThreshold = 0.5;
+      const stableRequired = 30;
+
+      window.addEventListener('deviceorientation', (event) => {
+        if (modelLocked && basePosition) {
+          const { alpha, beta, gamma } = event;
+
+          if (lastAlpha !== null) {
+            const dAlpha = Math.abs(alpha - lastAlpha);
+            const dBeta = Math.abs(beta - lastBeta);
+            const dGamma = Math.abs(gamma - lastGamma);
+
+            const dx = (gamma - lastGamma) * 0.005;
+            const dz = (beta - lastBeta) * 0.005;
+
+            visualOffset.x = visualOffset.x * (1 - smoothingFactor) + dx * smoothingFactor;
+            visualOffset.z = visualOffset.z * (1 - smoothingFactor) + dz * smoothingFactor;
+
+            if (dAlpha < stabilityThreshold && dBeta < stabilityThreshold && dGamma < stabilityThreshold) {
+              stableFrames++;
+            } else {
+              stableFrames = 0;
+            }
+
+            if (stableFrames >= stableRequired) {
+              visualOffset.x *= 0.9;
+              visualOffset.z *= 0.9;
+            }
+
+            const newX = basePosition.x + visualOffset.x;
+            const newZ = basePosition.z + visualOffset.z;
+            model.setAttribute('position', `${newX} 0 ${newZ}`);
+          }
+
+          lastAlpha = alpha;
+          lastBeta = beta;
+          lastGamma = gamma;
+        }
+      });
     </script>
   </body>
 </html>
