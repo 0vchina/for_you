@@ -2,70 +2,58 @@
 const benchLat = 52.1534551;  // замените на свои координаты
 const benchLon = 26.1956841;
 const modelURL = 'https://0vchina.github.io/for_you/model.glb';
-let modelEntity = null;
+
 let placed = false;
 
-function toRadians(deg) {
-  return deg * Math.PI / 180;
+function gpsToMeters(lat1, lon1, lat2, lon2) {
+  const R = 6378137;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const x = dLon * R * Math.cos((lat1 + lat2) / 2 * Math.PI / 180);
+  const y = dLat * R;
+  return { x, z: -y }; // -y → чтобы модель стояла "вперёд"
 }
 
-function destinationPoint(lat, lon, distance, bearing) {
-  const R = 6371000;
-  const δ = distance / R;
-  const θ = toRadians(bearing);
-  const φ1 = toRadians(lat);
-  const λ1 = toRadians(lon);
-
-  const φ2 = Math.asin(Math.sin(φ1) * Math.cos(δ) +
-      Math.cos(φ1) * Math.sin(δ) * Math.cos(θ));
-  const λ2 = λ1 + Math.atan2(Math.sin(θ) * Math.sin(δ) * Math.cos(φ1),
-                             Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2));
-
-  return {
-    latitude: φ2 * 180 / Math.PI,
-    longitude: λ2 * 180 / Math.PI
-  };
-}
-
-AFRAME.registerComponent('load-model-stable', {
+AFRAME.registerComponent('fix-gps-model', {
   init: function () {
-    const scene = this.el.sceneEl;
-    let lastAccuracy = Infinity;
-    let lastPosition = null;
+    const sceneEl = this.el.sceneEl;
 
     window.addEventListener('gps-camera-update-position', (e) => {
-      const { latitude, longitude, accuracy } = e.detail.position;
+      if (placed) return;
+
+      const userLat = e.detail.position.latitude;
+      const userLon = e.detail.position.longitude;
+      const accuracy = e.detail.position.accuracy;
 
       if (accuracy > 15) {
-        console.log(`[GPS] Точность ${accuracy}м — слишком низкая`);
+        console.log(`[GPS] Точность ${accuracy}м — недостаточно`);
         return;
       }
 
-      if (placed) return;
+      console.log('[GPS] Позиция получена. Создаём модель');
 
-      console.log(`[GPS] Принятая точка с точностью ${accuracy}м`);
+      const offset = gpsToMeters(userLat, userLon, benchLat, benchLon);
+      const angleRad = 90 * (Math.PI / 180);
+      const distance = 15;
 
-      const modelCoords = destinationPoint(benchLat, benchLon, 15, 90);
-      modelEntity = document.createElement('a-entity');
-      modelEntity.setAttribute('id', 'target-model');
-      modelEntity.setAttribute('gps-entity-place', `latitude: ${modelCoords.latitude}; longitude: ${modelCoords.longitude}`);
-      modelEntity.setAttribute('gltf-model', modelURL);
-      modelEntity.setAttribute('scale', '1 1 1');
-      modelEntity.setAttribute('look-at', '[gps-camera]');
-      modelEntity.setAttribute('rotation', '0 0 0');
+      const x = offset.x + distance * Math.cos(angleRad);
+      const z = offset.z + distance * Math.sin(angleRad);
 
-      modelEntity.addEventListener('model-loaded', () => {
-        console.log('[SUCCESS] Модель загружена и размещена.');
+      const entity = document.createElement('a-entity');
+      entity.setAttribute('gltf-model', modelURL);
+      entity.setAttribute('position', `${x} 0 ${z}`);
+      entity.setAttribute('scale', '1 1 1');
+      entity.setAttribute('look-at', '[camera]');
+      entity.setAttribute('rotation', '0 0 0');
+
+      entity.addEventListener('model-loaded', () => {
+        console.log('[SUCCESS] Модель загружена.');
       });
 
-      modelEntity.addEventListener('model-error', (err) => {
-        console.error('[ERROR] Ошибка загрузки модели:', err);
-      });
-
-      scene.appendChild(modelEntity);
+      sceneEl.appendChild(entity);
       placed = true;
     });
   }
 });
 
-document.querySelector('a-scene').setAttribute('load-model-stable', '');
+document.querySelector('a-scene').setAttribute('fix-gps-model', '');
