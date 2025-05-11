@@ -12,44 +12,40 @@
       embedded
       arjs="sourceType: webcam; gpsMinAccuracy: 100; trackingMethod: best;"
     >
-      <!-- Камера с GPS -->
-      <a-camera gps-camera rotation-reader></a-camera>
+      <!-- Камера с GPS и отладочным текстом -->
+      <a-camera gps-camera rotation-reader>
+        <!-- Текст перед глазами -->
+        <a-entity 
+          id="debugText"
+          position="0 -0.5 -2"
+          text="value: GPS: загрузка...; color: yellow; width: 2; align: center;"
+        ></a-entity>
+      </a-camera>
 
-      <!-- 3D-модель рядом с HTML -->
+      <!-- 3D-модель -->
       <a-entity 
         gltf-model="model.glb"
         scale="10 10 10"
         rotation="0 180 0"
         position="0 0 0"
-        gps-entity-place="latitude: 52.1534534; longitude: 26.1951982"
-        show-nearby="latitude: 52.1534534; longitude: 26.1951982; maxDistance: 200"
+        gps-entity-place="latitude: 52.1534551; longitude: 26.1951000"
+        show-nearby="latitude: 52.1534551; longitude: 26.1951000; maxDistance: 2000"
         visible="false"
-      ></a-entity>
-
-      <!-- Текст для отладки -->
-      <a-entity 
-        id="debugText"
-        position="0 2 -3"
-        text="value: GPS: загрузка...; color: yellow; align: center;"
       ></a-entity>
     </a-scene>
 
-    <!-- Компонент для чтения поворота -->
     <script>
       AFRAME.registerComponent('rotation-reader', {
         tick: function () {
           const rotation = this.el.object3D.rotation;
         }
       });
-    </script>
 
-    <!-- Компонент видимости в радиусе и отладки -->
-    <script>
       AFRAME.registerComponent('show-nearby', {
         schema: {
           latitude: { type: 'number' },
           longitude: { type: 'number' },
-          maxDistance: { type: 'number', default: 200 }
+          maxDistance: { type: 'number', default: 2000 }
         },
 
         init: function () {
@@ -80,7 +76,6 @@
             this.visible = shouldBeVisible;
           }
 
-          // Обновление текста
           this.debugText.setAttribute(
             'text',
             'value',
