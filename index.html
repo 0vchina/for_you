@@ -1,52 +1,132 @@
-<script src="https://rawcdn.githack.com/AR-js-org/AR.js/3.4.2/aframe/build/aframe-ar.js"></script>
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>WebAR GPS-модель</title>
+    <script src="https://rawcdn.githack.com/AR-js-org/AR.js/3.4.2/aframe/build/aframe-ar.js"></script>
+    <style>
+      #debugInfo {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.8);
+        color: yellow;
+        font-family: monospace;
+        font-size: 14px;
+        white-space: pre-line;
+        z-index: 999;
+      }
+    </style>
+  </head>
+  <body style="margin: 0; overflow: hidden">
+    <div id="debugInfo">GPS: инициализация...</div>
 
-<a-scene
-  embedded
-  arjs="sourceType: webcam; trackingMethod: best;"
-  vr-mode-ui="enabled: false"
->
-  <a-camera></a-camera>
+    <a-scene
+      embedded
+      vr-mode-ui="enabled: false"
+      arjs="sourceType: webcam; trackingMethod: best;"
+    >
+      <a-camera></a-camera>
 
-  <a-entity id="modelContainer" visible="false">
-    <a-entity
-      id="targetModel"
-      gltf-model="model.glb"
-      scale="0.01 0.01 0.01"
-      rotation="0 180 0"
-    ></a-entity>
-  </a-entity>
-</a-scene>
+      <a-entity id="modelContainer" visible="false">
+        <a-entity
+          id="targetModel"
+          gltf-model="model.glb"
+          scale="0.01 0.01 0.01"
+          rotation="0 180 0"
+        ></a-entity>
+      </a-entity>
+    </a-scene>
 
-<script>
-const model = document.getElementById('targetModel');
-const container = document.getElementById('modelContainer');
+    <script>
+      const debugInfo = document.getElementById('debugInfo');
+      const model = document.getElementById('targetModel');
+      const container = document.getElementById('modelContainer');
 
-// Пример анимации вручную через JS
-function animateScaleUp() {
-  model.setAttribute('animation__scale', {
-    property: 'scale',
-    to: '3 3 3',
-    dur: 800,
-    easing: 'easeOutQuad'
-  });
-}
+      const entryLat = 52.1534551;
+      const entryLon = 26.1951000;
+      const entryDistance = 15;
 
-function animateScaleDown() {
-  model.setAttribute('animation__scale', {
-    property: 'scale',
-    to: '0.01 0.01 0.01',
-    dur: 500,
-    easing: 'easeInQuad'
-  });
-}
+      const anchorLat = 52.153400;
+      const anchorLon = 26.195200;
 
-// Включение камеры и логика показа модели (добавь GPS как в прежнем примере)
-container.setAttribute('visible', true);
-animateScaleUp();
+      let modelActive = false;
 
-// Пример отключения:
-setTimeout(() => {
-  animateScaleDown();
-  setTimeout(() => container.setAttribute('visible', false), 500);
-}, 5000);
-</script>
+      function computeDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371000;
+        const toRad = deg => deg * Math.PI / 180;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+          Math.sin(dLon / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      }
+
+      function computeOffset(lat1, lon1, lat2, lon2) {
+        const R = 6378137;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const x = dLon * R * Math.cos(lat1 * Math.PI / 180);
+        const z = dLat * R;
+        return { x, z: -z };
+      }
+
+      function animateScaleUp() {
+        model.setAttribute("animation__scale", {
+          property: "scale",
+          to: "3 3 3",
+          dur: 800,
+          easing: "easeOutQuad"
+        });
+      }
+
+      function animateScaleDown() {
+        model.setAttribute("animation__scale", {
+          property: "scale",
+          to: "0.01 0.01 0.01",
+          dur: 500,
+          easing: "easeInQuad"
+        });
+      }
+
+      navigator.geolocation.watchPosition(
+        pos => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          const distance = computeDistance(lat, lon, entryLat, entryLon);
+
+          debugInfo.innerText =
+            `Ваши координаты:\n${lat.toFixed(6)}, ${lon.toFixed(6)}\n` +
+            `До входа: ${distance.toFixed(1)} м`;
+
+          if (!modelActive && distance <= entryDistance) {
+            const offset = computeOffset(lat, lon, anchorLat, anchorLon);
+            container.setAttribute("visible", true);
+            container.setAttribute("position", `${offset.x} 0 ${offset.z}`);
+            animateScaleUp();
+            modelActive = true;
+            debugInfo.innerText += "\nМодель активирована!";
+          }
+
+          if (modelActive && distance > entryDistance + 5) {
+            animateScaleDown();
+            setTimeout(() => {
+              container.setAttribute("visible", false);
+            }, 500);
+            modelActive = false;
+            debugInfo.innerText += "\nМодель скрыта (вышли из зоны).";
+          }
+        },
+        err => {
+          console.error("Ошибка GPS:", err);
+          debugInfo.innerText = `Ошибка GPS:\n${err.message}`;
+        },
+        { enableHighAccuracy: true }
+      );
+    </script>
+  </body>
+</html>
