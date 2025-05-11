@@ -29,27 +29,46 @@
     >
       <a-camera></a-camera>
 
-      <a-entity id="modelContainer" visible="false">
-        <a-entity
-          id="targetModel"
-          gltf-model="model.glb"
-          scale="0.01 0.01 0.01"
-          rotation="0 180 0"
-        ></a-entity>
+      <!-- Модель и анимации -->
+      <a-entity
+        id="targetModel"
+        gltf-model="model.glb"
+        scale="0.01 0.01 0.01"
+        rotation="0 180 0"
+        visible="false"
+      >
+        <a-animation
+          id="scaleIn"
+          attribute="scale"
+          from="0.01 0.01 0.01"
+          to="3 3 3"
+          dur="800"
+          easing="ease-out"
+          begin="showModel"
+        ></a-animation>
+
+        <a-animation
+          id="scaleOut"
+          attribute="scale"
+          from="3 3 3"
+          to="0.01 0.01 0.01"
+          dur="500"
+          easing="ease-in"
+          begin="hideModel"
+          fill="forwards"
+        ></a-animation>
       </a-entity>
     </a-scene>
 
     <script>
       const debugInfo = document.getElementById('debugInfo');
       const model = document.getElementById('targetModel');
-      const container = document.getElementById('modelContainer');
 
       const entryLat = 52.1534551;
       const entryLon = 26.1951000;
-      const entryDistance = 15;
-
       const anchorLat = 52.153400;
       const anchorLon = 26.195200;
+      const entryDistance = 15;
 
       let modelActive = false;
 
@@ -75,24 +94,6 @@
         return { x, z: -z };
       }
 
-      function animateScaleUp() {
-        model.setAttribute("animation__scale", {
-          property: "scale",
-          to: "3 3 3",
-          dur: 800,
-          easing: "easeOutQuad"
-        });
-      }
-
-      function animateScaleDown() {
-        model.setAttribute("animation__scale", {
-          property: "scale",
-          to: "0.01 0.01 0.01",
-          dur: 500,
-          easing: "easeInQuad"
-        });
-      }
-
       navigator.geolocation.watchPosition(
         pos => {
           const lat = pos.coords.latitude;
@@ -105,24 +106,24 @@
 
           if (!modelActive && distance <= entryDistance) {
             const offset = computeOffset(lat, lon, anchorLat, anchorLon);
-            container.setAttribute("visible", true);
-            container.setAttribute("position", `${offset.x} 0 ${offset.z}`);
-            animateScaleUp();
+            model.setAttribute('position', `${offset.x} 0 ${offset.z}`);
+            model.setAttribute('visible', true);
+            model.emit('showModel');
             modelActive = true;
-            debugInfo.innerText += "\nМодель активирована!";
+            debugInfo.innerText += '\nМодель активирована!';
           }
 
           if (modelActive && distance > entryDistance + 5) {
-            animateScaleDown();
+            model.emit('hideModel');
             setTimeout(() => {
-              container.setAttribute("visible", false);
+              model.setAttribute('visible', false);
             }, 500);
             modelActive = false;
-            debugInfo.innerText += "\nМодель скрыта (вышли из зоны).";
+            debugInfo.innerText += '\nМодель скрыта (вышли из зоны).';
           }
         },
         err => {
-          console.error("Ошибка GPS:", err);
+          console.error('Ошибка GPS:', err);
           debugInfo.innerText = `Ошибка GPS:\n${err.message}`;
         },
         { enableHighAccuracy: true }
