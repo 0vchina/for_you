@@ -1,7 +1,9 @@
 // Координаты лавочки
 const benchLat = 52.1534551;  // замените на свои координаты
 const benchLon = 26.1956841;
-const modelURL = 'https://0vchina.github.io/for_you/model.glb';  // Убедитесь, что файл реально по этому пути
+const modelURL = 'https://0vchina.github.io/for_you/model.glb';
+let modelEntity = null;
+let placed = false;
 
 function toRadians(deg) {
   return deg * Math.PI / 180;
@@ -11,7 +13,6 @@ function destinationPoint(lat, lon, distance, bearing) {
   const R = 6371000;
   const δ = distance / R;
   const θ = toRadians(bearing);
-
   const φ1 = toRadians(lat);
   const λ1 = toRadians(lon);
 
@@ -26,43 +27,45 @@ function destinationPoint(lat, lon, distance, bearing) {
   };
 }
 
-AFRAME.registerComponent('load-model', {
+AFRAME.registerComponent('load-model-stable', {
   init: function () {
-    const sceneEl = this.el.sceneEl;
-
-    console.log('[INFO] Ждём GPS-позицию...');
+    const scene = this.el.sceneEl;
+    let lastAccuracy = Infinity;
+    let lastPosition = null;
 
     window.addEventListener('gps-camera-update-position', (e) => {
-      const position = e.detail.position;
-      console.log('[GPS] Позиция получена:', position);
+      const { latitude, longitude, accuracy } = e.detail.position;
 
-      if (document.querySelector('#target-model')) {
-        console.warn('[WARN] Модель уже добавлена.');
+      if (accuracy > 15) {
+        console.log(`[GPS] Точность ${accuracy}м — слишком низкая`);
         return;
       }
 
-      const target = destinationPoint(benchLat, benchLon, 15, 90);
-      console.log('[INFO] Расчёт координат модели:', target);
+      if (placed) return;
 
-      const entity = document.createElement('a-entity');
-      entity.setAttribute('id', 'target-model');
-      entity.setAttribute('gps-entity-place', `latitude: ${target.latitude}; longitude: ${target.longitude}`);
-      entity.setAttribute('gltf-model', modelURL);
-      entity.setAttribute('scale', '1 1 1');
-      entity.setAttribute('rotation', '0 0 0');
-      entity.setAttribute('look-at', '[gps-camera]');
+      console.log(`[GPS] Принятая точка с точностью ${accuracy}м`);
 
-      entity.addEventListener('model-loaded', () => {
-        console.log('[SUCCESS] Модель загружена.');
+      const modelCoords = destinationPoint(benchLat, benchLon, 15, 90);
+      modelEntity = document.createElement('a-entity');
+      modelEntity.setAttribute('id', 'target-model');
+      modelEntity.setAttribute('gps-entity-place', `latitude: ${modelCoords.latitude}; longitude: ${modelCoords.longitude}`);
+      modelEntity.setAttribute('gltf-model', modelURL);
+      modelEntity.setAttribute('scale', '1 1 1');
+      modelEntity.setAttribute('look-at', '[gps-camera]');
+      modelEntity.setAttribute('rotation', '0 0 0');
+
+      modelEntity.addEventListener('model-loaded', () => {
+        console.log('[SUCCESS] Модель загружена и размещена.');
       });
 
-      entity.addEventListener('model-error', (err) => {
+      modelEntity.addEventListener('model-error', (err) => {
         console.error('[ERROR] Ошибка загрузки модели:', err);
       });
 
-      sceneEl.appendChild(entity);
+      scene.appendChild(modelEntity);
+      placed = true;
     });
   }
 });
 
-document.querySelector('a-scene').setAttribute('load-model', '');
+document.querySelector('a-scene').setAttribute('load-model-stable', '');
