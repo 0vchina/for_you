@@ -68,7 +68,7 @@
     };
   }
 
-  // Расчёт угла между пользователем и моделью
+  // Угол между точками
   function computeBearing(lat1, lon1, lat2, lon2) {
     const toRad = deg => deg * Math.PI / 180;
     const toDeg = rad => rad * 180 / Math.PI;
@@ -146,10 +146,12 @@
       if (distance <= maxDistance) {
         const offset = computeOffset(lat, lon, targetLat, targetLon);
         const smooth = getSmoothedPosition(offset);
-        model.setAttribute('position', `${smooth.x} 0 ${smooth.z}`);
+
+        // Опускаем модель на 1 метр
+        model.setAttribute('position', `${smooth.x} -1 ${smooth.z}`);
         model.setAttribute('visible', true);
 
-        // Поворот к пользователю
+        // Поворачиваем к пользователю
         const bearingToModel = computeBearing(lat, lon, targetLat, targetLon);
         const rotationY = (bearingToModel + 180) % 360;
         model.setAttribute('rotation', `0 ${rotationY} 0`);
