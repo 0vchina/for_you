@@ -2,12 +2,13 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>WebAR GPS Fallback + Модель</title>
+    <title>WebAR GPS Fallback</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.2/aframe/build/aframe-ar.min.js"></script>
   </head>
   <body style="margin: 0; overflow: hidden;">
 
+    <!-- Отладочная информация -->
     <div id="debugInfo" style="
       position: absolute;
       top: 10px;
@@ -23,12 +24,14 @@
       GPS: инициализация...
     </div>
 
+    <!-- AR-сцена -->
     <a-scene
       vr-mode-ui="enabled: false"
       embedded
       arjs="sourceType: webcam; trackingMethod: best;"
     >
-      <a-entity camera></a-entity>
+      <!-- Камера -->
+      <a-camera></a-camera>
 
       <!-- Модель, позиционируемая вручную -->
       <a-entity
@@ -44,11 +47,12 @@
       const debugInfo = document.getElementById('debugInfo');
       const model = document.getElementById('targetModel');
 
-      // Целевая GPS-точка
+      // Целевая точка
       const targetLat = 52.1534551;
       const targetLon = 26.1951000;
-      const maxDistance = 2000; // м
+      const maxDistance = 2000; // метров
 
+      // Функция расчёта расстояния между двумя GPS-точками
       function computeDistance(lat1, lon1, lat2, lon2) {
         const R = 6371000;
         const toRad = deg => deg * Math.PI / 180;
@@ -62,9 +66,9 @@
         return R * c;
       }
 
+      // Смещение цели от пользователя в метрах → позиция в сцене
       function computeOffset(lat1, lon1, lat2, lon2) {
         const R = 6378137; // радиус Земли в метрах
-
         const dLat = (lat2 - lat1) * Math.PI / 180;
         const dLon = (lon2 - lon1) * Math.PI / 180;
 
@@ -74,6 +78,7 @@
         return { x, z: -z }; // z инвертирован для A-Frame координат
       }
 
+      // Отслеживаем позицию пользователя
       navigator.geolocation.watchPosition(
         pos => {
           const lat = pos.coords.latitude;
@@ -86,7 +91,6 @@
 
           if (distance <= maxDistance) {
             const offset = computeOffset(lat, lon, targetLat, targetLon);
-
             model.setAttribute('position', `${offset.x} 0 ${offset.z}`);
             model.setAttribute('visible', true);
           } else {
