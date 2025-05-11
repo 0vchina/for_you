@@ -8,19 +8,20 @@
   </head>
   <body style="margin: 0; overflow: hidden;">
 
-    <!-- Внешний отладочный блок -->
+    <!-- Внешний блок для вывода информации -->
     <div id="debugInfo" style="
       position: absolute;
       top: 10px;
       left: 10px;
       padding: 10px;
-      background: rgba(0, 0, 0, 0.7);
+      background: rgba(0, 0, 0, 0.8);
       color: yellow;
       font-family: monospace;
       font-size: 14px;
+      white-space: pre-line;
       z-index: 999;
     ">
-      GPS: ожидание данных...
+      Инициализация...
     </div>
 
     <!-- AR-сцена -->
@@ -32,15 +33,46 @@
       <a-camera gps-camera></a-camera>
     </a-scene>
 
-    <!-- Отслеживание GPS-события -->
+    <!-- Отладка координат -->
     <script>
+      const debugInfo = document.getElementById('debugInfo');
+
+      // Проверка через navigator.geolocation
+      debugInfo.innerText = 'Проверка navigator.geolocation...';
+
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          const coords = pos.coords;
+          console.log("navigator.geolocation работает:", coords);
+          debugInfo.innerText += `\nnavigator:\n${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
+        },
+        err => {
+          console.error("navigator.geolocation ошибка:", err);
+          debugInfo.innerText += `\nОшибка geolocation:\n${err.message}`;
+        },
+        { enableHighAccuracy: true }
+      );
+
+      // Слушаем gps-camera от AR.js
       window.addEventListener('gps-camera-update-position', e => {
         const coords = e.detail.position;
-        console.log('Координаты получены:', coords);
-        document.getElementById('debugInfo').innerText =
-          `GPS EVENT:\n${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
+        console.log('gps-camera-update-position:', coords);
+        debugInfo.innerText += `\nAR.js GPS:\n${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
+      });
+
+      // На всякий случай отслеживаем, был ли вообще создан gps-camera
+      document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+          const camera = document.querySelector('[gps-camera]');
+          if (!camera || !camera.components['gps-camera']) {
+            debugInfo.innerText += '\n[!] Компонент gps-camera не найден или не инициализировался.';
+            console.warn('gps-camera компонент отсутствует или не активен.');
+          } else {
+            debugInfo.innerText += '\nКомпонент gps-camera активен.';
+            console.log('gps-camera активен.');
+          }
+        }, 3000); // ждём немного для инициализации
       });
     </script>
-
   </body>
 </html>
