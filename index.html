@@ -2,18 +2,12 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>WebAR: Фиксация по GPS</title>
-
-  <!-- A-Frame и AR.js с GPS -->
+  <title>WebAR: Привязка и фиксация модели</title>
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.2/aframe/build/aframe-ar-nft.min.js"></script>
   <script src="https://unpkg.com/aframe-gps-camera@1.8.0/dist/aframe-gps-camera.min.js"></script>
-
   <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-    }
+    body { margin: 0; overflow: hidden; }
     #loading {
       position: absolute;
       top: 10px;
@@ -33,10 +27,8 @@
 <div id="loading">Ожидание GPS...</div>
 
 <a-scene vr-mode-ui="enabled: false" embedded arjs>
-  <!-- Камера с GPS -->
-  <a-entity camera gps-camera rotation-reader></a-entity>
+  <a-entity id="camera" camera gps-camera rotation-reader></a-entity>
 
-  <!-- Модель: появится при приближении на 5 м, затем оторвётся от GPS -->
   <a-entity
     id="model"
     gltf-model="model.glb"
@@ -51,44 +43,42 @@
 <script>
   const loading = document.getElementById('loading');
   const model = document.getElementById('model');
+  const camera = document.getElementById('camera');
 
   let modelFixed = false;
+  let userCoords = null;
 
-  // Обновление позиции пользователя
+  // Сохраняем координаты пользователя
   window.addEventListener('gps-camera-update-position', (e) => {
+    userCoords = e.detail.position;
     if (!modelFixed) {
-      const lat = e.detail.position.latitude.toFixed(6);
-      const lon = e.detail.position.longitude.toFixed(6);
-      loading.innerText = `Ожидание приближения...\nВаша позиция:\n${lat}, ${lon}`;
+      loading.innerText =
+        `Ваша позиция:\n${userCoords.latitude.toFixed(6)}, ${userCoords.longitude.toFixed(6)}\nОжидание фиксации модели...`;
     }
   });
 
-  // Когда модель получает GPS-позицию
+  // Обработка GPS позиции модели
   window.addEventListener('gps-entity-place-update-position', () => {
-    if (modelFixed) return;
+    if (modelFixed || !userCoords) return;
 
-    const camera = document.querySelector('[gps-camera]');
-    const userPos = camera.getAttribute('gps-camera');
-    const modelPos = model.getAttribute('gps-entity-place');
+    const modelCoords = model.getAttribute('gps-entity-place');
 
-    if (!userPos || !modelPos || !userPos.latitude || !modelPos.latitude) {
-      loading.innerText = 'Ожидание координат...';
+    if (!modelCoords || !modelCoords.latitude) {
+      loading.innerText = 'Ожидание координат модели...';
       return;
     }
 
     const dist = computeDistance(
-      userPos.latitude,
-      userPos.longitude,
-      modelPos.latitude,
-      modelPos.longitude
+      userCoords.latitude, userCoords.longitude,
+      modelCoords.latitude, modelCoords.longitude
     );
 
     if (dist > 5) {
-      loading.innerText = `До модели: ${dist.toFixed(1)} м\nПодойдите ближе (до 5 м)...`;
+      loading.innerText = `До модели: ${dist.toFixed(1)} м\nПодойдите ближе (≤ 5 м)...`;
       return;
     }
 
-    // Фиксация: отключаем GPS и привязываем к сцене
+    // Фиксация: удаляем GPS и задаём позицию напрямую
     const worldPos = model.object3D.getWorldPosition(new THREE.Vector3());
 
     model.removeAttribute('gps-entity-place');
@@ -101,21 +91,17 @@
     model.setAttribute('visible', 'true');
     model.emit('fix');
     modelFixed = true;
-
     loading.innerText = `Модель зафиксирована!`;
-    console.log('Финальная позиция модели:', worldPos);
   });
 
-  // Вычисление расстояния по координатам
   function computeDistance(lat1, lon1, lat2, lon2) {
     const R = 6371000;
     const toRad = deg => deg * Math.PI / 180;
     const dLat = toRad(lat2 - lat1);
     const dLon = toRad(lon2 - lon1);
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) ** 2;
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+              Math.sin(dLon / 2) ** 2;
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }
