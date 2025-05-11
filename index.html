@@ -1,13 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>AR GPS Viewer</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <title>AR GPS Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>body { margin: 0; overflow: hidden; }</style>
+
+  <!-- THREE.js и библиотеки -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.150.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.150.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.150.0/examples/jsm/webxr/ARButton.js"></script>
 </head>
 <body>
   <button id="start" style="position: absolute; top: 20px; left: 20px; z-index: 10;">Запустить AR</button>
-  <script type="module" src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
