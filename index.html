@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>WebAR GPS Fixed Model</title>
+  <title>WebAR GPS Fixed Model — 50м от лавочки</title>
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.2/aframe/build/aframe-ar.min.js"></script>
 </head>
@@ -42,10 +42,15 @@
   const debugInfo = document.getElementById('debugInfo');
   const model = document.getElementById('targetModel');
 
-  const targetLat = 52.1534551;
-  const targetLon = 26.1951000;
-  const maxDistance = 2000;
+  // координаты лавочки
+  const benchLat = 52.1534551;
+  const benchLon = 26.1951000;
 
+  // координаты модели (50 м вперёд по направлению 90° — восток)
+  const targetLat = 52.1534551;
+  const targetLon = 26.1956841; // рассчитано заранее
+
+  const maxDistance = 2000;
   const positionBuffer = [];
   const bufferSize = 5;
   let modelLocked = false;
