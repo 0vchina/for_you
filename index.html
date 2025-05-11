@@ -15,15 +15,22 @@
       <!-- Камера с GPS -->
       <a-camera gps-camera rotation-reader></a-camera>
 
-      <!-- 3D-модель, показывается в радиусе 20 м -->
+      <!-- 3D-модель рядом с HTML -->
       <a-entity 
         gltf-model="model.glb"
-        scale="100 100 100"
+        scale="10 10 10"
         rotation="0 180 0"
-        position="0 2 0"
-        gps-entity-place="latitude: 52.1534614; longitude: 26.1952552"
-        show-nearby="latitude: 52.1534614; longitude: 26.1952552; maxDistance: 1200"
+        position="0 0 0"
+        gps-entity-place="latitude: 52.1534534; longitude: 26.1951982"
+        show-nearby="latitude: 52.1534534; longitude: 26.1951982; maxDistance: 200"
         visible="false"
+      ></a-entity>
+
+      <!-- Текст для отладки -->
+      <a-entity 
+        id="debugText"
+        position="0 2 -3"
+        text="value: GPS: загрузка...; color: yellow; align: center;"
       ></a-entity>
     </a-scene>
 
@@ -31,30 +38,30 @@
     <script>
       AFRAME.registerComponent('rotation-reader', {
         tick: function () {
-          // Здесь можно читать ориентацию, если нужно
           const rotation = this.el.object3D.rotation;
         }
       });
     </script>
 
-    <!-- Компонент видимости в радиусе -->
+    <!-- Компонент видимости в радиусе и отладки -->
     <script>
       AFRAME.registerComponent('show-nearby', {
         schema: {
           latitude: { type: 'number' },
           longitude: { type: 'number' },
-          maxDistance: { type: 'number', default: 20 }
+          maxDistance: { type: 'number', default: 200 }
         },
 
         init: function () {
           this.camera = document.querySelector('[gps-camera]');
+          this.debugText = document.querySelector('#debugText');
           this.visible = false;
         },
 
         tick: function () {
           const gps = this.camera.components['gps-camera'];
           if (!gps || !gps.currentCoords) {
-            console.log('Ожидание координат GPS...');
+            this.debugText.setAttribute('text', 'value', 'GPS: ожидание координат...');
             return;
           }
 
@@ -72,10 +79,17 @@
             console.log(`Модель ${shouldBeVisible ? 'показана' : 'скрыта'}, расстояние: ${distance.toFixed(2)} м`);
             this.visible = shouldBeVisible;
           }
+
+          // Обновление текста
+          this.debugText.setAttribute(
+            'text',
+            'value',
+            `Вы: ${userCoords.latitude.toFixed(6)}, ${userCoords.longitude.toFixed(6)}\nДо цели: ${distance.toFixed(1)} м`
+          );
         },
 
         computeDistance: function (lat1, lon1, lat2, lon2) {
-          const R = 6371000; // радиус Земли в метрах
+          const R = 6371000;
           const toRad = deg => deg * Math.PI / 180;
           const dLat = toRad(lat2 - lat1);
           const dLon = toRad(lon2 - lon1);
