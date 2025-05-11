@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>WebAR: Привязка и фиксация модели</title>
+  <title>WebAR: Фиксация по GPS</title>
 
   <!-- A-Frame и AR.js с GPS -->
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
@@ -36,11 +36,11 @@
   <!-- Камера с GPS -->
   <a-entity camera gps-camera rotation-reader></a-entity>
 
-  <!-- Модель: на 15м вперёд по направлению лавочки, появится при приближении на 5м -->
+  <!-- Модель: появится при приближении на 5 м, затем оторвётся от GPS -->
   <a-entity
     id="model"
     gltf-model="model.glb"
-    scale="3 3 3"
+    scale="0 0 0"
     rotation="0 105 0"
     gps-entity-place="latitude: 52.153513; longitude: 26.195430;"
     visible="false"
@@ -54,49 +54,59 @@
 
   let modelFixed = false;
 
-  // Отображение позиции пользователя
+  // Обновление позиции пользователя
   window.addEventListener('gps-camera-update-position', (e) => {
     if (!modelFixed) {
       const lat = e.detail.position.latitude.toFixed(6);
       const lon = e.detail.position.longitude.toFixed(6);
-      loading.innerText = `Текущая позиция:\n${lat}, ${lon}\nОжидание приближения...`;
+      loading.innerText = `Ожидание приближения...\nВаша позиция:\n${lat}, ${lon}`;
     }
   });
 
-  // Когда модель получит GPS-позицию
-  window.addEventListener('gps-entity-place-update-position', (e) => {
+  // Когда модель получает GPS-позицию
+  window.addEventListener('gps-entity-place-update-position', () => {
     if (modelFixed) return;
 
-    const userPos = document.querySelector('[gps-camera]').components['gps-camera'].currentCoords;
-    const modelPos = model.components['gps-entity-place'].currentLocation;
-    const dist = computeDistance(userPos.latitude, userPos.longitude, modelPos.latitude, modelPos.longitude);
+    const camera = document.querySelector('[gps-camera]');
+    const userPos = camera.getAttribute('gps-camera');
+    const modelPos = model.getAttribute('gps-entity-place');
 
-    if (dist > 5) {
-      loading.innerText = `Вы слишком далеко. До цели: ${dist.toFixed(1)} м`;
+    if (!userPos || !modelPos || !userPos.latitude || !modelPos.latitude) {
+      loading.innerText = 'Ожидание координат...';
       return;
     }
 
-    loading.innerText = `Модель найдена. Фиксация...`;
+    const dist = computeDistance(
+      userPos.latitude,
+      userPos.longitude,
+      modelPos.latitude,
+      modelPos.longitude
+    );
 
-    // Получаем мировую позицию модели
+    if (dist > 5) {
+      loading.innerText = `До модели: ${dist.toFixed(1)} м\nПодойдите ближе (до 5 м)...`;
+      return;
+    }
+
+    // Фиксация: отключаем GPS и привязываем к сцене
     const worldPos = model.object3D.getWorldPosition(new THREE.Vector3());
 
-    // Удаляем GPS-привязку и фиксируем в AR-пространстве
     model.removeAttribute('gps-entity-place');
     model.setAttribute('position', {
       x: worldPos.x,
       y: worldPos.y,
       z: worldPos.z
     });
+
     model.setAttribute('visible', 'true');
     model.emit('fix');
     modelFixed = true;
 
     loading.innerText = `Модель зафиксирована!`;
-    console.log('Финальная позиция:', worldPos);
+    console.log('Финальная позиция модели:', worldPos);
   });
 
-  // Геодезическое расстояние между двумя координатами
+  // Вычисление расстояния по координатам
   function computeDistance(lat1, lon1, lat2, lon2) {
     const R = 6371000;
     const toRad = deg => deg * Math.PI / 180;
