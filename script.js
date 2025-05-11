@@ -34,7 +34,7 @@ function initAR() {
   document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
   const loader = new GLTFLoader();
-  loader.load('model/your_model.glb', (gltf) => {
+  loader.load('your_model.glb', (gltf) => {
     const model = gltf.scene;
     model.position.set(0, 0, -5); // 5 м впереди
     scene.add(model);
