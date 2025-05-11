@@ -2,77 +2,136 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>AR у лавочки — с эффектом</title>
+    <title>WebAR с GPS, шагами и компасом</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.2/aframe/build/aframe-ar.min.js"></script>
-    <script src="https://unpkg.com/aframe-animation-component@5.1.2/dist/aframe-animation-component.min.js"></script>
   </head>
   <body style="margin: 0; overflow: hidden;">
-    <div id="debugInfo" style="
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      padding: 10px;
-      background: rgba(0, 0, 0, 0.8);
-      color: yellow;
-      font-family: monospace;
-      font-size: 14px;
-      z-index: 999;
-    ">
-      Ожидание GPS...
+    <div
+      id="debugInfo"
+      style="
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: yellow;
+        font-family: monospace;
+        font-size: 14px;
+        white-space: pre-line;
+        z-index: 999;
+      "
+    >
+      GPS: инициализация...
     </div>
 
-    <a-scene
-      vr-mode-ui="enabled: false"
-      embedded
-      arjs="sourceType: webcam; gpsMinAccuracy: 50; debugUIEnabled: false;"
-    >
-      <a-camera gps-camera rotation-reader></a-camera>
-
+    <a-scene embedded vr-mode-ui="enabled: false">
       <a-entity
         id="targetModel"
         gltf-model="model.glb"
-        scale="0 0 0"
-        rotation="0 180 0"
+        scale="3 3 3"
+        position="0 0 -5"
         visible="false"
-        material="opacity: 0; transparent: true"
-      >
-        <!-- Анимация появления -->
-        <a-animation
-          attribute="scale"
-          dur="1000"
-          to="3 3 3"
-          easing="ease-out"
-          begin="showModel"
-        ></a-animation>
+      ></a-entity>
 
-        <a-animation
-          attribute="material.opacity"
-          dur="1000"
-          to="1"
-          easing="ease-out"
-          begin="showModel"
-        ></a-animation>
-      </a-entity>
+      <a-camera
+        id="userCamera"
+        position="0 0 0"
+        look-controls-enabled="false"
+        wasd-controls-enabled="false"
+      ></a-camera>
     </a-scene>
 
     <script>
-      const debug = document.getElementById("debugInfo");
+      const debugInfo = document.getElementById("debugInfo");
+      const camera = document.getElementById("userCamera");
       const model = document.getElementById("targetModel");
 
-      const benchLat = 52.1534551;
-      const benchLon = 26.1951000;
-      const maxDistance = 10;
+      // GPS точки
+      const modelLat = 52.1534551;
+      const modelLon = 26.1951;
+      const triggerLat = 52.1535;
+      const triggerLon = 26.19515;
+      const triggerRadius = 10;
 
-      let shown = false;
+      let modelActivated = false;
 
+      // Компас
+      let currentRotation = 0;
+
+      window.addEventListener("deviceorientationabsolute", (e) => {
+        if (e.absolute && e.alpha != null) {
+          currentRotation = 360 - e.alpha;
+        }
+      });
+
+      // Акселерометр — "шаг"
+      let lastStepTime = 0;
+      window.addEventListener("devicemotion", (e) => {
+        const accZ = e.accelerationIncludingGravity.z;
+        const now = Date.now();
+
+        if (Math.abs(accZ) > 1.2 && now - lastStepTime > 600 && modelActivated) {
+          lastStepTime = now;
+          const stepDistance = 0.5; // полметра за шаг
+          const angleRad = currentRotation * Math.PI / 180;
+
+          const dx = Math.sin(angleRad) * stepDistance;
+          const dz = Math.cos(angleRad) * stepDistance;
+
+          const oldPos = camera.getAttribute("position");
+          camera.setAttribute("position", {
+            x: oldPos.x + dx,
+            y: oldPos.y,
+            z: oldPos.z + dz,
+          });
+        }
+      });
+
+      // Расстояние
       function computeDistance(lat1, lon1, lat2, lon2) {
         const R = 6371000;
-        const toRad = deg => deg * Math.PI / 180;
+        const toRad = (deg) => (deg * Math.PI) / 180;
         const dLat = toRad(lat2 - lat1);
         const dLon = toRad(lon2 - lon1);
         const a =
           Math.sin(dLat / 2) ** 2 +
-          Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-          Math.sin(dLon / 2) ** 2;
-        const c = 2 * Math.atan2
+          Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      }
+
+      // Смещение модели (размещение от игрока)
+      function computeOffset(lat1, lon1, lat2, lon2) {
+        const R = 6378137;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const x = dLon * R * Math.cos(lat1 * Math.PI / 180);
+        const z = dLat * R;
+        return { x, z: -z };
+      }
+
+      // Активация модели
+      navigator.geolocation.watchPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          const distToTrigger = computeDistance(lat, lon, triggerLat, triggerLon);
+
+          debugInfo.innerText = `Ваши координаты:\n${lat.toFixed(6)}, ${lon.toFixed(6)}\nДо активации: ${distToTrigger.toFixed(1)} м`;
+
+          if (!modelActivated && distToTrigger <= triggerRadius) {
+            const offset = computeOffset(lat, lon, modelLat, modelLon);
+            model.setAttribute("position", `${offset.x} 0 ${offset.z}`);
+            model.setAttribute("visible", true);
+            modelActivated = true;
+            debugInfo.innerText += `\nМодель активирована!`;
+          }
+        },
+        (err) => {
+          debugInfo.innerText = `Ошибка GPS:\n${err.message}`;
+        },
+        { enableHighAccuracy: true }
+      );
+    </script>
+  </body>
+</html>
