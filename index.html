@@ -33,7 +33,7 @@
     id="targetModel"
     gltf-model="model.glb"
     scale="3 3 3"
-    rotation="0 180 0"
+    rotation="0 105 0"
     visible="false"
   ></a-entity>
 </a-scene>
@@ -42,11 +42,9 @@
   const debugInfo = document.getElementById('debugInfo');
   const model = document.getElementById('targetModel');
 
-  // Координаты лавочки
   const benchLat = 52.1534551;
   const benchLon = 26.1951000;
 
-  // Функция вычисления GPS-точки 50м на восток (90°)
   function computeDestination(lat, lon, distanceMeters, bearingDegrees) {
     const R = 6378137;
     const bearing = bearingDegrees * Math.PI / 180;
@@ -69,7 +67,6 @@
     };
   }
 
-  // Модель должна появляться в этой точке
   const target = computeDestination(benchLat, benchLon, 50, 90);
   const targetLat = target.lat;
   const targetLon = target.lon;
