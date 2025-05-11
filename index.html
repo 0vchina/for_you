@@ -1,107 +1,153 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <title>WebAR GPS-модель</title>
-    <script src="https://rawcdn.githack.com/AR-js-org/AR.js/3.4.2/aframe/build/aframe-ar.js"></script>
-    <style>
-      #debugInfo {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        padding: 10px;
-        background: rgba(0, 0, 0, 0.8);
-        color: yellow;
-        font-family: monospace;
-        font-size: 14px;
-        white-space: pre-line;
-        z-index: 999;
+<head>
+  <meta charset="utf-8" />
+  <title>WebAR GPS Fixed Direction</title>
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.2/aframe/build/aframe-ar.min.js"></script>
+</head>
+<body style="margin: 0; overflow: hidden;">
+<div id="debugInfo" style="
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.8);
+  color: yellow;
+  font-family: monospace;
+  font-size: 14px;
+  white-space: pre-line;
+  z-index: 999;
+">
+  GPS: инициализация...
+</div>
+
+<a-scene vr-mode-ui="enabled: false" embedded arjs="sourceType: webcam; trackingMethod: best;">
+  <a-camera></a-camera>
+
+  <a-entity
+    id="targetModel"
+    gltf-model="model.glb"
+    scale="3 3 3"
+    rotation="0 180 0"
+    visible="false"
+  ></a-entity>
+</a-scene>
+
+<script>
+  const debugInfo = document.getElementById('debugInfo');
+  const model = document.getElementById('targetModel');
+
+  const benchLat = 52.1534551;
+  const benchLon = 26.1951000;
+  const benchBearing = 90; // например, 90° = восток
+  const appearDistance = 2.0; // порог для активации, в метрах
+  const modelDistance = 5.0; // на сколько метров вперед появляется модель
+
+  const positionBuffer = [];
+  const bufferSize = 5;
+  let modelLocked = false;
+
+  function computeDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const toRad = deg => deg * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  function computeOffset(lat1, lon1, lat2, lon2) {
+    const R = 6378137;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const x = dLon * R * Math.cos(lat1 * Math.PI / 180);
+    const z = dLat * R;
+    return { x, z: -z };
+  }
+
+  function getSmoothedPosition(newPos) {
+    positionBuffer.push(newPos);
+    if (positionBuffer.length > bufferSize) positionBuffer.shift();
+
+    const avg = positionBuffer.reduce(
+      (acc, p) => ({
+        x: acc.x + p.x,
+        z: acc.z + p.z
+      }),
+      { x: 0, z: 0 }
+    );
+
+    return {
+      x: avg.x / positionBuffer.length,
+      z: avg.z / positionBuffer.length
+    };
+  }
+
+  function computeDestination(lat, lon, distance, bearingDeg) {
+    const R = 6378137;
+    const bearing = bearingDeg * Math.PI / 180;
+    const latRad = lat * Math.PI / 180;
+    const lonRad = lon * Math.PI / 180;
+
+    const newLat = Math.asin(
+      Math.sin(latRad) * Math.cos(distance / R) +
+      Math.cos(latRad) * Math.sin(distance / R) * Math.cos(bearing)
+    );
+
+    const newLon = lonRad + Math.atan2(
+      Math.sin(bearing) * Math.sin(distance / R) * Math.cos(latRad),
+      Math.cos(distance / R) - Math.sin(latRad) * Math.sin(newLat)
+    );
+
+    return {
+      lat: newLat * 180 / Math.PI,
+      lon: newLon * 180 / Math.PI
+    };
+  }
+
+  navigator.geolocation.watchPosition(
+    pos => {
+      if (modelLocked) return;
+
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      const accuracy = pos.coords.accuracy;
+      const distance = computeDistance(lat, lon, benchLat, benchLon);
+
+      debugInfo.innerText =
+        `Ваши координаты:\n${lat.toFixed(6)}, ${lon.toFixed(6)}\n` +
+        `Точность: ${accuracy.toFixed(1)} м\n` +
+        `До лавочки: ${distance.toFixed(1)} м\n` +
+        'Ожидание...';
+
+      if (distance <= appearDistance) {
+        const target = computeDestination(benchLat, benchLon, modelDistance, benchBearing);
+        const offset = computeOffset(lat, lon, target.lat, target.lon);
+        const smooth = getSmoothedPosition(offset);
+        model.setAttribute('position', `${smooth.x} 0 ${smooth.z}`);
+        model.setAttribute('visible', true);
+
+        if (positionBuffer.length >= bufferSize) {
+          modelLocked = true;
+          debugInfo.innerText += '\nМодель зафиксирована!';
+          console.log("Модель установлена по направлению лавочки:", smooth);
+        }
+      } else {
+        model.setAttribute('visible', false);
+        positionBuffer.length = 0;
       }
-    </style>
-  </head>
-  <body style="margin: 0; overflow: hidden">
-    <div id="debugInfo">GPS: инициализация...</div>
-
-    <a-scene
-      embedded
-      vr-mode-ui="enabled: false"
-      arjs="sourceType: webcam; trackingMethod: best;"
-    >
-      <a-camera></a-camera>
-
-      <a-entity
-        id="targetModel"
-        gltf-model="model.glb"
-        scale="3 3 3"
-        rotation="0 180 0"
-        visible="false"
-      ></a-entity>
-    </a-scene>
-
-    <script>
-      const debugInfo = document.getElementById("debugInfo");
-      const model = document.getElementById("targetModel");
-
-      const entryLat = 52.1534551;
-      const entryLon = 26.1951000;
-      const anchorLat = 52.153400;
-      const anchorLon = 26.195200;
-      const entryDistance = 15;
-
-      let modelActive = false;
-
-      function computeDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371000;
-        const toRad = deg => deg * Math.PI / 180;
-        const dLat = toRad(lat2 - lat1);
-        const dLon = toRad(lon2 - lon1);
-        const a =
-          Math.sin(dLat / 2) ** 2 +
-          Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-          Math.sin(dLon / 2) ** 2;
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-      }
-
-      function computeOffset(lat1, lon1, lat2, lon2) {
-        const R = 6378137;
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const x = dLon * R * Math.cos(lat1 * Math.PI / 180);
-        const z = dLat * R;
-        return { x, z: -z };
-      }
-
-      navigator.geolocation.watchPosition(
-        pos => {
-          const lat = pos.coords.latitude;
-          const lon = pos.coords.longitude;
-          const distance = computeDistance(lat, lon, entryLat, entryLon);
-
-          debugInfo.innerText =
-            `Ваши координаты:\n${lat.toFixed(6)}, ${lon.toFixed(6)}\n` +
-            `До входа: ${distance.toFixed(1)} м`;
-
-          if (!modelActive && distance <= entryDistance) {
-            const offset = computeOffset(lat, lon, anchorLat, anchorLon);
-            model.setAttribute("position", `${offset.x} 0 ${offset.z}`);
-            model.setAttribute("visible", true);
-            modelActive = true;
-            debugInfo.innerText += "\nМодель активирована!";
-          }
-
-          if (modelActive && distance > entryDistance + 5) {
-            model.setAttribute("visible", false);
-            modelActive = false;
-            debugInfo.innerText += "\nМодель скрыта.";
-          }
-        },
-        err => {
-          console.error("Ошибка GPS:", err);
-          debugInfo.innerText = `Ошибка GPS:\n${err.message}`;
-        },
-        { enableHighAccuracy: true }
-      );
-    </script>
-  </body>
+    },
+    err => {
+      console.error('Ошибка GPS:', err);
+      debugInfo.innerText = `Ошибка GPS:\n${err.message}`;
+    },
+    { enableHighAccuracy: true }
+  );
+</script>
+</body>
 </html>
