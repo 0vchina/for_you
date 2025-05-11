@@ -1,36 +1,34 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta charset="utf-8" />
-    <title>WebAR: GPS на 50 м вперёд</title>
+    <meta charset="utf-8">
+    <title>WebAR — Модель в 50м от лавочки</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
     <script src="https://unpkg.com/aframe-gps-camera/dist/aframe-gps-camera.min.js"></script>
     <style>
       body { margin: 0; overflow: hidden; }
-      #debug {
+      #info {
         position: absolute;
-        top: 10px;
-        left: 10px;
+        top: 10px; left: 10px;
         background: rgba(0,0,0,0.8);
-        color: yellow;
-        padding: 10px;
+        color: #0f0;
         font-family: monospace;
         font-size: 14px;
+        padding: 10px;
         z-index: 999;
-        white-space: pre-line;
       }
     </style>
   </head>
   <body>
 
-    <div id="debug">Ожидание GPS...</div>
+    <div id="info">Ожидание GPS...</div>
 
     <a-scene embedded arjs>
       <!-- Камера с GPS -->
       <a-entity camera gps-camera rotation-reader></a-entity>
 
-      <!-- Модель размещается по координатам 50 м от лавочки -->
+      <!-- Модель, точно по GPS в 50 м на восток от лавочки -->
       <a-entity
         gltf-model="model.glb"
         scale="3 3 3"
@@ -40,11 +38,15 @@
     </a-scene>
 
     <script>
-      const debug = document.getElementById('debug');
+      const info = document.getElementById('info');
       window.addEventListener('gps-camera-update-position', (e) => {
         const { latitude, longitude, accuracy } = e.detail.position;
-        debug.innerText = `GPS активен:\n${latitude.toFixed(6)}, ${longitude.toFixed(6)}\nТочность: ${accuracy.toFixed(1)} м`;
+        info.innerText =
+          `GPS активен:\n` +
+          `Ваши координаты:\n${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n` +
+          `Точность: ${accuracy.toFixed(1)} м`;
       });
     </script>
+
   </body>
 </html>
